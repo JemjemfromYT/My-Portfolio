@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">  
+<html lang="en"> 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
@@ -287,13 +287,115 @@
         }
         .emilia-silhouette.active { opacity: 1; }
 
+        /* ===== BIG CENTERED SILHOUETTE BACKDROP =====
+           Sits BEHIND glass cards / lyrics / nav (low z-index),
+           but ABOVE the page background. Two layers crossfade
+           in sync with each character swap. */
+        .silhouette-backdrop {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.9s ease;
+            z-index: 5;            /* below content (.glass-card, lyrics, nav) */
+            overflow: hidden;
+        }
+        .silhouette-backdrop.active { opacity: 1; }
+
+        .silhouette-backdrop::before {
+            /* soft radial vignette to focus on the silhouette */
+            content: "";
+            position: absolute;
+            inset: -10%;
+            background:
+                radial-gradient(ellipse at center,
+                    hsla(280, 70%, 60%, 0.18) 0%,
+                    hsla(220, 80%, 30%, 0.08) 35%,
+                    transparent 70%);
+            filter: blur(40px);
+            opacity: 0.9;
+            animation: silBackdropPulse 7s ease-in-out infinite;
+        }
+        @keyframes silBackdropPulse {
+            0%, 100% { opacity: 0.55; transform: scale(1); }
+            50%      { opacity: 1;    transform: scale(1.05); }
+        }
+
+        .sil-layer {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            width: min(85vh, 72vw);
+            height: min(185vh, 172vw);
+            max-width: 1880px;
+            max-height: 1880px;
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.94);
+            filter:
+                drop-shadow(0 0 28px hsla(280, 90%, 70%, 0.45))
+                drop-shadow(0 0 70px hsla(220, 100%, 60%, 0.35));
+            transition:
+                opacity 1s cubic-bezier(.4, 0, .2, 1),
+                transform 1.4s cubic-bezier(.22, .9, .3, 1.2),
+                filter 1.2s ease;
+            will-change: opacity, transform, filter;
+        }
+        .sil-layer img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+        .sil-layer.active {
+            opacity: 0.85;
+            transform: translate(-50%, -50%) scale(1);
+            animation: silFloat 8s ease-in-out infinite;
+        }
+        .sil-layer.exiting {
+            opacity: 0;
+            transform: translate(-50%, -55%) scale(1.06);
+            filter:
+                drop-shadow(0 0 40px hsla(320, 100%, 70%, 0.25))
+                blur(6px);
+        }
+        @keyframes silFloat {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50%      { transform: translate(-50%, -52%) scale(1.015); }
+        }
+
+        /* Tablet — slightly smaller */
+        @media (max-width: 1024px) {
+            .sil-layer {
+                width: min(80vh, 85vw);
+                height: min(80vh, 85vw);
+                opacity: 0;
+            }
+            .sil-layer.active { opacity: 0.78; }
+        }
+        /* Mobile — keep big but a touch dimmer so lyrics stay readable */
+        @media (max-width: 640px) {
+            .sil-layer {
+                width: min(70vh, 92vw);
+                height: min(70vh, 92vw);
+            }
+            .sil-layer.active { opacity: 0.7; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .sil-layer, .sil-layer.active {
+                animation: none !important;
+                transition: opacity 0.4s ease !important;
+            }
+        }
+
         .char-stage {
             position: absolute;
             top: 50%;
-            /* Clamp width so characters always fit on screen, even on small phones */
-            width: clamp(180px, min(46vh, 38vw), 520px);
-            height: clamp(260px, min(72vh, 62vw), 760px);
-            max-width: 92vw;
+            width: min(58vh, 44vw);
+            height: min(80vh, 70vw);
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
@@ -312,45 +414,11 @@
             height: 100%;
         }
         /* Position variants */
-        .char-stage[data-pos="right"]  { right: 4%; left: auto; }
-        .char-stage[data-pos="left"]   { left: 4%;  right: auto; }
+        .char-stage[data-pos="right"]  { right: 3%; left: auto; }
+        .char-stage[data-pos="left"]   { left: 3%;  right: auto; }
         .char-stage[data-pos="center"] { left: 50%; right: auto; transform: translate(-50%, -50%) scale(0.95); }
-        /* Far positions used to sit off-screen; pull them back so they stay visible */
-        .char-stage[data-pos="far-right"] { right: 8%; left: auto; }
-        .char-stage[data-pos="far-left"]  { left: 8%;  right: auto; }
-
-        /* Mobile / small screens — center everything and shrink so no char gets clipped */
-        @media (max-width: 640px) {
-            .char-stage {
-                width: clamp(160px, 70vw, 320px);
-                height: clamp(240px, 95vw, 460px);
-            }
-            .char-stage[data-pos="right"],
-            .char-stage[data-pos="far-right"],
-            .char-stage[data-pos="left"],
-            .char-stage[data-pos="far-left"] {
-                left: 50%; right: auto;
-                transform: translate(-50%, -50%) scale(0.92);
-            }
-            .char-stage[data-pos="right"].active,
-            .char-stage[data-pos="far-right"].active,
-            .char-stage[data-pos="left"].active,
-            .char-stage[data-pos="far-left"].active {
-                transform: translate(-50%, -50%) scale(1);
-            }
-            .char-stage[data-pos="right"].lingering,
-            .char-stage[data-pos="far-right"].lingering,
-            .char-stage[data-pos="left"].lingering,
-            .char-stage[data-pos="far-left"].lingering {
-                transform: translate(-50%, -50%) scale(0.985);
-            }
-            .char-stage[data-pos="right"].exiting,
-            .char-stage[data-pos="far-right"].exiting,
-            .char-stage[data-pos="left"].exiting,
-            .char-stage[data-pos="far-left"].exiting {
-                transform: translate(-50%, -50%) scale(0.9);
-            }
-        }
+        .char-stage[data-pos="far-right"] { right: -8%; left: auto; }
+        .char-stage[data-pos="far-left"]  { left: -8%;  right: auto; }
 
         /* Active = visible on stage */
         .char-stage.active {
@@ -891,6 +959,12 @@
 </div>
 
 <!-- Styx Helix Mode Overlay Elements -->
+<!-- Big centered silhouette backdrop (one-at-a-time crossfade) -->
+<div class="silhouette-backdrop" id="silhouette-backdrop" aria-hidden="true">
+    <div class="sil-layer" id="sil-layer-a"><img alt=""></div>
+    <div class="sil-layer" id="sil-layer-b"><img alt=""></div>
+</div>
+
 <div class="emilia-silhouette" id="emilia-silhouette" aria-hidden="true">
     <div class="char-stage" data-char="emilia"   data-pos="right"  id="char-emilia"><div class="char-inner"><img class="char-real" data-char-src="characters/emilia.gif" src="characters/emilia.gif" alt="Emilia animation" loading="eager" decoding="async"></div></div>
     <div class="char-stage" data-char="rem"      data-pos="left"   id="char-rem"><div class="char-inner"><img class="char-real" data-char-src="characters/rem.gif" src="characters/rem.gif" alt="Rem animation" loading="eager" decoding="async"></div></div>
@@ -939,56 +1013,7 @@
     <div class="char-stage" data-char="ryuzu"     data-group="spirit"  data-pos="left"  id="char-ryuzu"><div class="char-inner"><img class="char-real" data-char-src="characters/ryuzu.png" src="characters/ryuzu.png" alt="" loading="eager" decoding="async"></div></div>
     <!-- OTHER ENEMIES -->
     <div class="char-stage" data-char="elsa"      data-group="other"   data-pos="right" id="char-elsa"><div class="char-inner"><img class="char-real" data-char-src="characters/elsa.gif" src="characters/elsa.gif" alt="" loading="eager" decoding="async"></div></div>
-    <div class="char-stage" data-char="meili"     data-group="other"   data-pos="left"  id="char-meili"><div class="char-inner"><img class="char-real" data-char-src="characters/meili.png" src="characters/meili.png" alt="" loading="eager" decoding="async"></div>    <!-- ===== Newly added real character stages ===== -->
-    <div class="char-stage" data-char="rom" data-group="knight" data-pos="right" id="char-rom"><div class="char-inner"><img class="char-real" data-char-src="characters/rom.png" src="characters/rom.png" alt="rom" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="whitewhale" data-group="enemy" data-pos="center" id="char-whitewhale"><div class="char-inner"><img class="char-real" data-char-src="characters/whitewhale.png" src="characters/whitewhale.png" alt="whitewhale" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="greatrabbit" data-group="enemy" data-pos="left" id="char-greatrabbit"><div class="char-inner"><img class="char-real" data-char-src="characters/greatrabbit.png" src="characters/greatrabbit.png" alt="greatrabbit" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="ryuzu_shima" data-group="spirit" data-pos="right" id="char-ryuzu_shima"><div class="char-inner"><img class="char-real" data-char-src="characters/ryuzu_shima.png" src="characters/ryuzu_shima.png" alt="ryuzu_shima" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="ryuzu_bilma" data-group="spirit" data-pos="center" id="char-ryuzu_bilma"><div class="char-inner"><img class="char-real" data-char-src="characters/ryuzu_bilma.png" src="characters/ryuzu_bilma.png" alt="ryuzu_bilma" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="ryuzu_arma" data-group="spirit" data-pos="left" id="char-ryuzu_arma"><div class="char-inner"><img class="char-real" data-char-src="characters/ryuzu_arma.png" src="characters/ryuzu_arma.png" alt="ryuzu_arma" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="volcanica" data-group="figure" data-pos="center" id="char-volcanica"><div class="char-inner"><img class="char-real" data-char-src="characters/volcanica.png" src="characters/volcanica.png" alt="volcanica" loading="lazy" decoding="async"></div></div>
-    <!-- ===== Silhouette twins (paired 1:1 with characters/) ===== -->
-    <div class="char-stage" data-char="emilia" data-group="royal" data-style="silhouette" data-pos="right" id="char-emilia-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-emilia.png" src="silhouette/silhouette-emilia.png" alt="emilia silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="rem" data-group="mansion" data-style="silhouette" data-pos="left" id="char-rem-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-rem.png" src="silhouette/silhouette-rem.png" alt="rem silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="subaru" data-group="main" data-style="silhouette" data-pos="left" id="char-subaru-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-subaru.png" src="silhouette/silhouette-subaru.png" alt="subaru silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="beatrice" data-group="mansion" data-style="silhouette" data-pos="right" id="char-beatrice-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-beatrice.png" src="silhouette/silhouette-beatrice.png" alt="beatrice silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="puck" data-group="spirit" data-style="silhouette" data-pos="right" id="char-puck-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-puck.png" src="silhouette/silhouette-puck.png" alt="puck silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="satella" data-group="witch" data-style="silhouette" data-pos="center" id="char-satella-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-satella.png" src="silhouette/silhouette-satella.png" alt="satella silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="crusch" data-group="royal" data-style="silhouette" data-pos="right" id="char-crusch-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-crusch.png" src="silhouette/silhouette-crusch.png" alt="crusch silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="anastasia" data-group="royal" data-style="silhouette" data-pos="left" id="char-anastasia-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-anastasia.png" src="silhouette/silhouette-anastasia.png" alt="anastasia silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="priscilla" data-group="royal" data-style="silhouette" data-pos="right" id="char-priscilla-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-priscilla.png" src="silhouette/silhouette-priscilla.png" alt="priscilla silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="felt" data-group="royal" data-style="silhouette" data-pos="left" id="char-felt-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-felt.png" src="silhouette/silhouette-felt.png" alt="felt silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="otto" data-group="knight" data-style="silhouette" data-pos="right" id="char-otto-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-otto.png" src="silhouette/silhouette-otto.png" alt="otto silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="garfiel" data-group="knight" data-style="silhouette" data-pos="left" id="char-garfiel-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-garfiel.png" src="silhouette/silhouette-garfiel.png" alt="garfiel silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="roswaal" data-group="knight" data-style="silhouette" data-pos="center" id="char-roswaal-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-roswaal.png" src="silhouette/silhouette-roswaal.png" alt="roswaal silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="frederica" data-group="mansion" data-style="silhouette" data-pos="right" id="char-frederica-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-frederica.png" src="silhouette/silhouette-frederica.png" alt="frederica silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="petra" data-group="mansion" data-style="silhouette" data-pos="left" id="char-petra-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-petra.png" src="silhouette/silhouette-petra.png" alt="petra silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="felix" data-group="knight" data-style="silhouette" data-pos="right" id="char-felix-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-felix.png" src="silhouette/silhouette-felix.png" alt="felix silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="wilhelm" data-group="knight" data-style="silhouette" data-pos="left" id="char-wilhelm-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-wilhelm.png" src="silhouette/silhouette-wilhelm.png" alt="wilhelm silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="julius" data-group="knight" data-style="silhouette" data-pos="right" id="char-julius-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-julius.png" src="silhouette/silhouette-julius.png" alt="julius silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="reinhard" data-group="knight" data-style="silhouette" data-pos="center" id="char-reinhard-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-reinhard.png" src="silhouette/silhouette-reinhard.png" alt="reinhard silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="rom" data-group="knight" data-style="silhouette" data-pos="right" id="char-rom-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-rom.png" src="silhouette/silhouette-rom.png" alt="rom silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="al" data-group="knight" data-style="silhouette" data-pos="left" id="char-al-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-al.png" src="silhouette/silhouette-al.png" alt="al silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="ram" data-group="mansion" data-style="silhouette" data-pos="right" id="char-ram-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-ram.png" src="silhouette/silhouette-ram.png" alt="ram silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="echidna" data-group="witch" data-style="silhouette" data-pos="center" id="char-echidna-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-echidna.png" src="silhouette/silhouette-echidna.png" alt="echidna silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="minerva" data-group="witch" data-style="silhouette" data-pos="right" id="char-minerva-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-minerva.png" src="silhouette/silhouette-minerva.png" alt="minerva silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="sekhmet" data-group="witch" data-style="silhouette" data-pos="left" id="char-sekhmet-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-sekhmet.png" src="silhouette/silhouette-sekhmet.png" alt="sekhmet silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="daphne" data-group="witch" data-style="silhouette" data-pos="center" id="char-daphne-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-daphne.png" src="silhouette/silhouette-daphne.png" alt="daphne silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="typhon" data-group="witch" data-style="silhouette" data-pos="right" id="char-typhon-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-typhon.png" src="silhouette/silhouette-typhon.png" alt="typhon silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="carmilla" data-group="witch" data-style="silhouette" data-pos="left" id="char-carmilla-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-carmilla.png" src="silhouette/silhouette-carmilla.png" alt="carmilla silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="petelgeuse" data-group="enemy" data-style="silhouette" data-pos="center" id="char-petelgeuse-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-petelgeuse.png" src="silhouette/silhouette-petelgeuse.png" alt="petelgeuse silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="regulus" data-group="enemy" data-style="silhouette" data-pos="left" id="char-regulus-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-regulus.png" src="silhouette/silhouette-regulus.png" alt="regulus silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="lye" data-group="enemy" data-style="silhouette" data-pos="right" id="char-lye-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-lye.png" src="silhouette/silhouette-lye.png" alt="lye silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="elsa" data-group="enemy" data-style="silhouette" data-pos="right" id="char-elsa-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-elsa.png" src="silhouette/silhouette-elsa.png" alt="elsa silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="meili" data-group="enemy" data-style="silhouette" data-pos="left" id="char-meili-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-meili.png" src="silhouette/silhouette-meili.png" alt="meili silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="whitewhale" data-group="enemy" data-style="silhouette" data-pos="center" id="char-whitewhale-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-whitewhale.png" src="silhouette/silhouette-whitewhale.png" alt="whitewhale silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="greatrabbit" data-group="enemy" data-style="silhouette" data-pos="left" id="char-greatrabbit-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-greatrabbit.png" src="silhouette/silhouette-greatrabbit.png" alt="greatrabbit silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="ryuzu" data-group="spirit" data-style="silhouette" data-pos="left" id="char-ryuzu-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-ryuzu.png" src="silhouette/silhouette-ryuzu.png" alt="ryuzu silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="ryuzu_shima" data-group="spirit" data-style="silhouette" data-pos="right" id="char-ryuzu_shima-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-ryuzu_shima.png" src="silhouette/silhouette-ryuzu_shima.png" alt="ryuzu_shima silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="ryuzu_bilma" data-group="spirit" data-style="silhouette" data-pos="center" id="char-ryuzu_bilma-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-ryuzu_bilma.png" src="silhouette/silhouette-ryuzu_bilma.png" alt="ryuzu_bilma silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="ryuzu_arma" data-group="spirit" data-style="silhouette" data-pos="left" id="char-ryuzu_arma-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-ryuzu_arma.png" src="silhouette/silhouette-ryuzu_arma.png" alt="ryuzu_arma silhouette" loading="lazy" decoding="async"></div></div>
-    <div class="char-stage" data-char="volcanica" data-group="figure" data-style="silhouette" data-pos="center" id="char-volcanica-sil"><div class="char-inner"><img class="char-real silhouette-animate" data-char-src="silhouette/silhouette-volcanica.png" src="silhouette/silhouette-volcanica.png" alt="volcanica silhouette" loading="lazy" decoding="async"></div></div>
-</div>
+    <div class="char-stage" data-char="meili"     data-group="other"   data-pos="left"  id="char-meili"><div class="char-inner"><img class="char-real" data-char-src="characters/meili.png" src="characters/meili.png" alt="" loading="eager" decoding="async"></div></div>
 </div>
 
 <!-- Lightning flash overlay (used by enter-lightning effect) -->

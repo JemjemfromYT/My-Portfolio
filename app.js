@@ -1,5 +1,5 @@
 const supabaseUrl = 'https://mpcjnyuczjukfazplqjc.supabase.co';
-const supabaseKey = 'sb_publishable_S8r-c688VW112n85RRZ7Vw_e5p7W6Fr';
+const supabaseKey = 'sb_publishable_S8r-c688VW112n85RRZ7Vw_e5p7W6Fr'; 
 const db = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 const stealthBtn = document.getElementById('stealth-btn');
@@ -51,6 +51,57 @@ const musicForm = document.getElementById('music-form');
 // Styx Helix Mode elements
 const styxAudio = document.getElementById('styx-audio');
 const emiliaSilhouette = document.getElementById('emilia-silhouette');
+const silhouetteBackdrop = document.getElementById('silhouette-backdrop');
+const silLayerA = document.getElementById('sil-layer-a');
+const silLayerB = document.getElementById('sil-layer-b');
+let silActiveLayer = 'a';
+let silCurrentChar = null;
+const silImageCache = new Map();
+
+function preloadSilhouette(charId) {
+    if (silImageCache.has(charId)) return silImageCache.get(charId);
+    const url = `silhouette/silhouette-${charId.toLowerCase()}.png`;
+    const img = new Image();
+    img.src = url;
+    silImageCache.set(charId, url);
+    return url;
+}
+
+function updateSilhouetteDisplay(charId) {
+    if (!charId || !silhouetteBackdrop || !silLayerA || !silLayerB) return;
+    if (charId === silCurrentChar) return;
+    silCurrentChar = charId;
+
+    const url = preloadSilhouette(charId);
+    const incoming = silActiveLayer === 'a' ? silLayerB : silLayerA;
+    const outgoing = silActiveLayer === 'a' ? silLayerA : silLayerB;
+    const incomingImg = incoming.querySelector('img');
+
+    const swap = () => {
+        incoming.classList.remove('exiting');
+        incoming.classList.add('active');
+        outgoing.classList.remove('active');
+        outgoing.classList.add('exiting');
+        silActiveLayer = silActiveLayer === 'a' ? 'b' : 'a';
+        silhouetteBackdrop.classList.add('active');
+    };
+
+    if (incomingImg.src && incomingImg.src.endsWith(url)) {
+        swap();
+    } else {
+        const probe = new Image();
+        probe.onload = () => { incomingImg.src = url; swap(); };
+        probe.onerror = () => { /* silently skip if missing */ };
+        probe.src = url;
+    }
+}
+
+function clearSilhouetteDisplay() {
+    silCurrentChar = null;
+    silhouetteBackdrop?.classList.remove('active');
+    silLayerA?.classList.remove('active', 'exiting');
+    silLayerB?.classList.remove('active', 'exiting');
+}
 const discoLights = document.getElementById('disco-lights');
 const lyricsContainer = document.getElementById('lyrics-container');
 const lyricsText = document.getElementById('lyrics-text');
@@ -1122,6 +1173,7 @@ function deactivateStyxHelixMode() {
     document.body.classList.remove('styx-playing');
     
     emiliaSilhouette?.classList.remove('active', 'reveal', 'chorus-moment', 'front', 'left', 'center');
+    clearSilhouetteDisplay();
     discoLights?.classList.remove('active', 'chorus-moment');
     document.querySelectorAll('.char-stage').forEach(resetStage);
     lyricsContainer?.classList.remove('active');
@@ -1140,188 +1192,129 @@ function deactivateStyxHelixMode() {
 }
 
 // ===== Character cast rotation for Styx Helix =====
-// Narrative-driven: each lyric line picks a character that matches the
-// emotional/canonical meaning of that moment in Re:Zero.
+const CHAR_CAST = ['emilia','rem','subaru','beatrice','puck','satella'];
 const CHAR_POSITIONS = ['right','left','center','far-right','far-left'];
 const CHAR_ENTERS = ['enter-right','enter-left','enter-up','enter-zoom'];
 const CHAR_ENTERS_NEW = ['enter-sil-drop','enter-shatter','enter-ink-bleed','enter-lightning'];
-
-// Filenames match the user's `characters/` folder (case-sensitive).
-// Every real character ALSO has a silhouette twin under the `<id>-sil` key,
-// pointing to `silhouette/silhouette-<name>.png` — same naming, paired 1:1.
+// All characters point to characters/<Name>.gif first.
+// The fallback system (installCharacterImageFallback) automatically tries:
+//   1) .gif <-> .png extension swap
+//   2) characters/ <-> silhouette/ folder swap
+// So you can drop ANY character file in EITHER folder as EITHER format.
+// Filenames match the user's `characters/` folder exactly (case-sensitive).
+// Silhouettes live in `silhouette/` with a `silhouette-` prefix.
+// The fallback system handles: .gif <-> .png AND characters/<Name> <-> silhouette/silhouette-<name>.
 const CHAR_IMAGE_PATHS = {
-    // === MAIN ===
-    subaru:    'characters/subaru.gif',
-
-    // === ROYAL CANDIDATES ===
+    // === Featured (real character GIFs) ===
     emilia:    'characters/emilia.gif',
-    crusch:    'characters/crusch.gif',
-    anastasia: 'characters/anastasia.gif',
-    priscilla: 'characters/priscilla.gif',
-    felt:      'characters/felt.gif',
-
-    // === KNIGHTS / SUPPORTERS ===
-    otto:      'characters/otto.gif',
-    garfiel:   'characters/garfiel.png',
-    roswaal:   'characters/roswaal.gif',
-    frederica: 'characters/frederica.png',
-    petra:     'characters/petra.png',
-    felix:     'characters/felix.gif',
-    wilhelm:   'characters/wilhelm.gif',
-    julius:    'characters/julius.gif',
-    reinhard:  'characters/reinhard.gif',
-    rom:       'characters/rom.png',
-    al:        'characters/al.png',
-
-    // === MANSION ALLIES ===
     rem:       'characters/rem.gif',
-    ram:       'characters/ram.gif',
+    subaru:    'characters/subaru.gif',
     beatrice:  'characters/Beatrice.gif',
-
-    // === WITCHES OF SIN ===
-    satella:   'characters/satella.png',
-    echidna:   'characters/echidna.png',
-    minerva:   'characters/minerva.png',
-    sekhmet:   'characters/sekhmet.png',
-    daphne:    'characters/daphne.png',
-    typhon:    'characters/typhon.png',
-    carmilla:  'characters/carmilla.png',
-
-    // === ENEMIES (Sin Archbishops) ===
-    petelgeuse:'characters/petelgeuse.gif',
-    regulus:   'characters/regulus.png',
-    lye:       'characters/lye.png',
-
-    // === OTHER ENEMIES ===
-    elsa:      'characters/elsa.gif',
-    meili:     'characters/meili.png',
-    whitewhale:'characters/whitewhale.png',
-    greatrabbit:'characters/greatrabbit.png',
-
-    // === SPIRITS ===
     puck:      'characters/puck.gif',
+    satella:   'characters/satella.png',
 
-    // === DEMI-HUMANS / SANCTUARY ===
-    ryuzu:        'characters/ryuzu.png',
-    ryuzu_shima:  'characters/ryuzu_shima.png',
-    ryuzu_bilma:  'characters/ryuzu_bilma.png',
-    ryuzu_arma:   'characters/ryuzu_arma.png',
 
-    // === IMPORTANT FIGURES ===
-    volcanica: 'characters/volcanica.png',
+    // === Full cast — points to characters/ first, auto-fallback to silhouette/ ===
+    crusch:     'characters/crusch.gif',
+    anastasia:  'characters/anastasia.gif',
+    priscilla:  'characters/priscilla.gif',
+    felt:       'characters/felt.gif',
+    otto:       'characters/otto.gif',
+    garfiel:    'characters/garfiel.png',
+    roswaal:    'characters/roswaal.gif',
+    felix:      'characters/felix.gif',
+    wilhelm:    'characters/wilhelm.gif',
+    julius:     'characters/julius.gif',
+    reinhard:   'characters/reinhard.gif',
+    al:         'characters/al.png',
+    ram:        'characters/ram.gif',
+    petra:      'characters/petra.png',
+    frederica:  'characters/frederica.png',
+    echidna:    'characters/echidna.png',
+    minerva:    'characters/minerva.png',
+    sekhmet:    'characters/sekhmet.png',
+    daphne:     'characters/daphne.png',
+    typhon:     'characters/typhon.png',
+    carmilla:   'characters/carmilla.png',
+    petelgeuse: 'characters/petelgeuse.gif',
+    regulus:    'characters/regulus.png',
+    lye:        'characters/lye.png',
+    roy:        'characters/roy.png',
+    capella:    'characters/capella.png',
+    sirius:     'characters/sirius.png',
+    ryuzu:      'characters/ryuzu.png',
+    elsa:       'characters/elsa.gif',
+    meili:      'characters/meili.png',
 };
-
-// Auto-generate silhouette pairs for every real character.
-// Convention: `<id>-sil` → `silhouette/silhouette-<filename-stem>.png`
-Object.keys(CHAR_IMAGE_PATHS).forEach(id => {
-    if (id.endsWith('-sil')) return;
-    const real = CHAR_IMAGE_PATHS[id];
-    const stem = real.split('/').pop().replace(/\.(gif|png|jpg|jpeg|webp)$/i, '');
-    CHAR_IMAGE_PATHS[id + '-sil'] = `silhouette/silhouette-${stem.toLowerCase()}.png`;
-});
-
-// Canon-aligned narrative groups (matches user's Re:Zero roster).
 const CHAR_GROUPS = {
-    main:        ['subaru'],
-    royal:       ['emilia','crusch','anastasia','priscilla','felt'],
-    knight:      ['otto','garfiel','roswaal','frederica','petra','felix','wilhelm','julius','reinhard','rom','al'],
-    mansion:     ['rem','ram','beatrice','petra'],
-    witch:       ['satella','echidna','minerva','sekhmet','daphne','typhon','carmilla'],
-    enemy:       ['petelgeuse','regulus','lye'],
-    other_enemy: ['elsa','meili','whitewhale','greatrabbit'],
-    spirit:      ['beatrice','puck'],
-    demi:        ['garfiel','frederica','ryuzu','ryuzu_shima','ryuzu_bilma','ryuzu_arma'],
-    figure:      ['volcanica'],
+    main:    ['subaru'],
+    royal:   ['emilia','crusch','anastasia','priscilla','felt'],
+    knight:  ['otto','garfiel','roswaal','felix','wilhelm','julius','reinhard','al'],
+    mansion: ['rem','beatrice','ram','petra','frederica'],
+    witch:   ['satella','echidna','minerva','sekhmet','daphne','typhon','carmilla'],
+    enemy:   ['petelgeuse','regulus','lye','roy','capella','sirius'],
+    spirit:  ['beatrice','puck','ryuzu'],
+    other:   ['elsa','meili'],
 };
-
-// Silhouette-mode pools — used during the most haunting chorus moments.
-const CHAR_GROUPS_SIL = {
-    witch:    ['satella-sil','echidna-sil','minerva-sil','sekhmet-sil','daphne-sil','typhon-sil','carmilla-sil'],
-    enemy:    ['petelgeuse-sil','regulus-sil','lye-sil'],
-    mansion:  ['rem-sil','ram-sil','beatrice-sil'],
-    spirit:   ['beatrice-sil','puck-sil'],
-    main:     ['subaru-sil'],
-    royal:    ['emilia-sil','crusch-sil','anastasia-sil','priscilla-sil','felt-sil'],
-    other_enemy: ['elsa-sil','meili-sil','whitewhale-sil','greatrabbit-sil'],
-};
-
-// Lyric hooks — each entry maps a Styx Helix lyric pattern to the canon
-// character/scene it actually refers to in Re:Zero.
-//   sil:true  → use the silhouette twin (shadow form) for this moment.
 const LYRIC_HOOKS = [
-    // "Don't let me die / waiting for your touch" — Emilia, Subaru's promise
-    { match: /don'?t let me die|waiting for your touch/i, char: 'emilia', effect: 'enter-sil-drop' },
+    // === Iconic Re:Zero moments — explicit timing per character ===
+    // RESTART → Subaru (Return by Death)
+    { match: /restart/i,                       char: 'subaru',     effect: 'enter-lightning', flash: true },
 
-    // "Restart" — Subaru's Return by Death
-    { match: /restart/i,                       char: 'subaru',   effect: 'enter-lightning', flash: true },
+    // CHORUS — Emilia is the heart of the song
+    { match: /please don'?t let me die/i,      char: 'emilia',     effect: 'enter-sil-drop' },
+    { match: /waiting for your touch/i,        char: 'rem',        effect: 'enter-right' },
+    { match: /don'?t give up on life/i,        char: 'beatrice',   effect: 'enter-zoom' },
+    { match: /endless dead end/i,              char: 'satella',    effect: 'enter-shatter',   flash: true },
+    { match: /never close your eyes/i,         char: 'echidna',    effect: 'enter-ink-bleed' },
+    { match: /searching for a true fate/i,     char: 'puck',       effect: 'enter-up' },
+    { match: /see you off|see you again/i,     char: 'rem',        effect: 'enter-sil-drop' },
+    { match: /let us try again/i,              char: 'subaru',     effect: 'enter-up' },
+    { match: /from the very first time/i,      char: 'emilia',     effect: 'enter-left' },
 
-    // "Endless dead end" — the Witch of Envy's curse
-    { match: /endless dead end/i,              char: 'satella',  effect: 'enter-shatter', flash: true, sil: true },
+    // VERSE — Japanese lines mapped to canon characters
+    { match: /kurutta tokei|spinning around/i, char: 'roswaal',    effect: 'enter-ink-bleed' },
+    { match: /kioku no suna|memories are gone/i, char: 'beatrice', effect: 'enter-ink-bleed' },
+    { match: /mebaeta omoi/i,                  char: 'petra',      effect: 'enter-up' },
+    { match: /akkenaku/i,                      char: 'felt',       effect: 'enter-left' },
+    { match: /kiete shimau/i,                  char: 'frederica',  effect: 'enter-sil-drop' },
+    { match: /i wish i was there/i,            char: 'crusch',     effect: 'enter-up' },
+    { match: /nidoto nanimo/i,                 char: 'wilhelm',    effect: 'enter-left' },
+    { match: /watashi wo wasurete/i,           char: 'reinhard',   effect: 'enter-lightning', flash: true },
+    { match: /kanashimi/i,                     char: 'petelgeuse', effect: 'enter-ink-bleed' },
+    { match: /itsuka owarimasu/i,              char: 'julius',     effect: 'enter-right' },
 
-    // "Memories / sand / kioku / time spinning" — Beatrice (lost contract, library)
-    { match: /memor|kioku|sand|spinning|time is/i, char: 'beatrice', effect: 'enter-ink-bleed' },
+    // VERSE 2
+    { match: /deep black eyes/i,               char: 'satella',    effect: 'enter-shatter' },
+    { match: /forgot what time/i,              char: 'anastasia',  effect: 'enter-left' },
+    { match: /amai kaori/i,                    char: 'priscilla',  effect: 'enter-zoom' },
+    { match: /tsuioku|wana/i,                  char: 'elsa',       effect: 'enter-shatter' },
+    { match: /sasoware|toraware/i,             char: 'meili',      effect: 'enter-ink-bleed' },
+    { match: /aragae mo sezu/i,                char: 'lye',        effect: 'enter-ink-bleed' },
+    { match: /oborete shimau/i,                char: 'capella',    effect: 'enter-lightning', flash: true },
+    { match: /i wish you were here/i,          char: 'felix',      effect: 'enter-right' },
 
-    // "Kanashimi / kudaku" — grief that breaks; Petelgeuse embodies broken devotion
-    { match: /kanashimi|kudaku|grief/i,        char: 'petelgeuse', effect: 'enter-ink-bleed', sil: true },
+    // BRIDGE / CHORUS 3
+    { match: /dokoka kieta|nukumori/i,         char: 'ram',        effect: 'enter-left' },
+    { match: /oikake tsuzukete/i,              char: 'garfiel',    effect: 'enter-up' },
+    { match: /kitto kitto/i,                   char: 'otto',       effect: 'enter-right' },
+    { match: /munashii wa/i,                   char: 'regulus',    effect: 'enter-shatter',   flash: true },
 
-    // "Wish / negai / touch / I wish I was there" — Rem, her undying wish
-    { match: /wish|negai/i,                    char: 'rem',      effect: 'enter-sil-drop' },
+    // FADING / OUTRO
+    { match: /fading in|fading out/i,          char: 'sirius',     effect: 'enter-ink-bleed' },
+    { match: /i wish we were there/i,          char: 'al',         effect: 'enter-up' },
+    { match: /ano hibi/i,                      char: 'ryuzu',      effect: 'enter-sil-drop' },
+    { match: /toki wa tsuyoku/i,               char: 'minerva',    effect: 'enter-up' },
+    { match: /tada tada susunde/i,             char: 'sekhmet',    effect: 'enter-left' },
+    { match: /furikaeranai/i,                  char: 'daphne',     effect: 'enter-ink-bleed' },
+    { match: /enjiteru/i,                      char: 'typhon',     effect: 'enter-right' },
+    { match: /carmilla|love|koi/i,             char: 'carmilla',   effect: 'enter-zoom' },
+    { match: /roy|greed/i,                     char: 'roy',        effect: 'enter-shatter' },
 
-    // "Black eyes / kuroi / deep" — Satella's shadow
-    { match: /black eyes|deep black|kuroi/i,   char: 'satella',  effect: 'enter-ink-bleed', sil: true },
-
-    // "Fading in, fading out" — Witches fading from the Sanctuary
-    { match: /fading/i,                        group: 'witch',   effect: 'enter-ink-bleed', sil: true },
-
-    // "See you off / sayonara / see you again" — Royal Selection farewells
-    { match: /see you|sayonara|farewell/i,     group: 'royal',   effect: 'enter-sil-drop' },
-
-    // "Try again / from the very first time" — Subaru looping back
-    { match: /try again|first time|hajimete/i, char: 'subaru',   effect: 'enter-zoom' },
-
-    // "Searching / oikake / never close your eyes" — Puck/Beatrice (spirits guiding)
-    { match: /searching|oikake|never close/i,  group: 'spirit',  effect: 'enter-up' },
-
-    // "Owarimasu / itsuka / dead end / kudaku" — Sin Archbishops looming
-    { match: /owari|dead end/i,                group: 'enemy',   effect: 'enter-shatter', sil: true },
-
-    // "Forgot / wasurete" — Echidna (Trial of memory)
-    { match: /wasurete|forgot/i,               char: 'echidna',  effect: 'enter-ink-bleed' },
-
-    // "Hibi / modorenai / ano days" — past Subaru couldn't return to
-    { match: /hibi|modorenai|days are gone/i,  char: 'subaru',   effect: 'enter-up', sil: true },
-
-    // "Tsuyoku / strong / enjiteru" — Reinhard (the strongest knight)
-    { match: /tsuyoku|enjiteru|strongest/i,    char: 'reinhard', effect: 'enter-lightning', flash: true },
-
-    // "Kimi to / with you / waiting for a new day" — Emilia
-    { match: /kimi to|with you|new day/i,      char: 'emilia',   effect: 'enter-sil-drop' },
-
-    // "Kienai / don't disappear / nidoto" — Rem's fading existence
-    { match: /kienai|nidoto/i,                 char: 'rem',      effect: 'enter-ink-bleed', sil: true },
-
-    // "Tsuioku / wana / amai kaori" — Echidna's tea party trap
-    { match: /tsuioku|wana|kaori/i,            char: 'echidna',  effect: 'enter-ink-bleed' },
-
-    // "Sasoware / toraware / oborete" — drowning in temptation; witches
-    { match: /sasoware|toraware|oborete/i,     group: 'witch',   effect: 'enter-ink-bleed', sil: true },
-];
-
-// Verse-cycle: a narrative arc Subaru → allies → witches → return.
-// When no lyric hook matches, walk this sequence so it tells a story
-// instead of feeling random.
-const VERSE_NARRATIVE = [
-    'subaru','emilia','rem','beatrice','puck',
-    'subaru','otto','ram','garfiel','frederica',
-    'crusch','wilhelm','felix','julius','reinhard',
-    'subaru','echidna','minerva','sekhmet','daphne',
-    'petelgeuse','regulus','elsa','meili',
-    'subaru','emilia','rem','beatrice',
-];
-const CHORUS_NARRATIVE = [
-    'satella-sil','emilia','subaru','rem-sil','beatrice',
-    'echidna','satella','reinhard','petelgeuse-sil','satella-sil',
-    'emilia','subaru','rem','puck-sil',
+    // Fallback group hooks (broad matches, used only if nothing above matched)
+    { match: /memor|time|kioku/i,  group: 'spirit', effect: 'enter-ink-bleed' },
+    { match: /wish|negai|touch/i,  group: 'mansion',effect: 'enter-sil-drop' },
+    { match: /sayonara/i,          group: 'royal',  effect: 'enter-sil-drop' },
 ];
 let lastCharId = null;
 const STAGE_STATE_CLASSES = ['active','reveal','chorus','front','flip','enter-right','enter-left','enter-up','enter-zoom','enter-sil-drop','enter-shatter','enter-ink-bleed','enter-lightning','lingering','exiting'];
@@ -1412,6 +1405,7 @@ function showInitialCharacter() {
 
     lastCharId = 'emilia';
     showStage(initialStage, 'right', 'enter-right', false);
+    updateSilhouetteDisplay('emilia');
 }
 
 function swapCharacter(lyricIndex, lyric) {
@@ -1419,7 +1413,6 @@ function swapCharacter(lyricIndex, lyric) {
     let charId = null;
     let effect = null;
     let flash = false;
-    let useSil = false;
 
     // 1) Try lyric-keyword hooks first (canon Re:Zero moments)
     for (const hook of LYRIC_HOOKS) {
@@ -1427,42 +1420,39 @@ function swapCharacter(lyricIndex, lyric) {
             if (hook.char) {
                 charId = hook.char;
             } else if (hook.group && CHAR_GROUPS[hook.group]) {
-                const pool = (hook.sil && CHAR_GROUPS_SIL[hook.group])
-                    ? CHAR_GROUPS_SIL[hook.group]
-                    : CHAR_GROUPS[hook.group];
+                const pool = CHAR_GROUPS[hook.group];
                 charId = pool[lyricIndex % pool.length];
             }
             effect = hook.effect;
             flash = !!hook.flash;
-            useSil = !!hook.sil;
             break;
         }
     }
 
-    // 2) Otherwise walk a narrative arc instead of random group picks.
-    //    Choruses use the haunting silhouette-heavy arc; verses tell the
-    //    Subaru → allies → opposition story.
+    // 2) Otherwise pick by chorus intensity → group
     if (!charId) {
-        const arc = lyric.isChorus ? CHORUS_NARRATIVE : VERSE_NARRATIVE;
-        charId = arc[lyricIndex % arc.length];
+        let group;
+        if (lyric.isChorus && lyricIndex % 5 === 0)      group = 'witch';
+        else if (lyric.isChorus && lyricIndex % 4 === 0) group = 'enemy';
+        else if (lyric.isChorus && lyricIndex % 3 === 0) group = 'knight';
+        else if (lyric.isChorus)                          group = 'royal';
+        else if (lyricIndex % 6 === 0)                    group = 'spirit';
+        else if (lyricIndex % 4 === 0)                    group = 'other';
+        else if (lyricIndex % 3 === 0)                    group = 'mansion';
+        else                                              group = 'main';
+        const pool = CHAR_GROUPS[group];
+        charId = pool[lyricIndex % pool.length];
     }
 
-    // 3) Resolve silhouette suffix → real stage id (sil chars live as `<id>-sil`)
-    //    The hook may have asked for the silhouette form via `useSil`.
-    if (useSil && !charId.endsWith('-sil')) {
-        charId = charId + '-sil';
-    }
-
-    // 4) Avoid same character twice in a row — fall back to a curated rotation
+    // 3) Avoid same character twice in a row
     if (charId === lastCharId) {
-        const fallback = lyric.isChorus
-            ? ['satella-sil','emilia','rem-sil','beatrice','subaru','echidna']
-            : ['subaru','emilia','rem','beatrice','otto','crusch','reinhard'];
+        const fallback = ['emilia','rem','beatrice','crusch','reinhard','echidna','wilhelm','ram'];
         charId = fallback[lyricIndex % fallback.length];
     }
     lastCharId = charId;
+    updateSilhouetteDisplay(charId);
 
-    // 5) Pick effect — keyword hook wins, otherwise blend old + new pools
+    // 4) Pick effect — keyword hook wins, otherwise blend old + new pools
     if (!effect) {
         const allEnters = lyric.isChorus
             ? [...CHAR_ENTERS, ...CHAR_ENTERS_NEW, 'enter-shatter', 'enter-lightning']
@@ -1471,10 +1461,7 @@ function swapCharacter(lyricIndex, lyric) {
     }
 
     const stage = document.getElementById('char-' + charId);
-    if (!stage) {
-        console.warn('[styx-helix] missing char stage:', 'char-' + charId);
-        return;
-    }
+    if (!stage) return;
 
     const stages = Array.from(document.querySelectorAll('.char-stage'));
     stages.forEach(prevStage => {

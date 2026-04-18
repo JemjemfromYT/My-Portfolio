@@ -1,5 +1,5 @@
 /* ============================================
-   STYX HELIX TEMPORARY THEME
+   STYX HELIX TEMPORARY THEME 
    These styles ONLY apply while the Styx Helix track is playing
    (body gets `.styx-playing` class). When music stops, the
    site automatically reverts to its original sky/emerald palette.
@@ -167,4 +167,36 @@ body.styx-playing .char-stage.active .char-real,
 body.styx-playing .char-stage.lingering .char-real,
 body.styx-playing .char-stage.exiting .char-real {
     opacity: 1 !important;
+}
+
+/* ===== BIG CENTERED SILHOUETTE BACKDROP ===== */
+/* Only visible while Styx Helix plays. Sits behind glass cards / lyrics / nav. */
+.silhouette-backdrop { display: none; }
+body.styx-playing .silhouette-backdrop { display: flex; }
+
+/* Make sure portfolio content floats above the silhouette.
+   NOTE: do NOT touch .lyrics-container here — it relies on position:fixed
+   to stay pinned at the bottom of the viewport. Forcing position:relative
+   would drop it back into normal flow and effectively hide it. Lyrics
+   already has z-index:50 in its own stylesheet, well above the backdrop. */
+body.styx-playing .glass-card,
+body.styx-playing .section-nav-bar,
+body.styx-playing .nav-dock,
+body.styx-playing header,
+body.styx-playing footer,
+body.styx-playing main {
+    position: relative;
+    z-index: 20;
+}
+
+/* Lyrics: keep its fixed positioning, just guarantee it sits above the silhouette */
+body.styx-playing .lyrics-container {
+    z-index: 60 !important;
+}
+
+/* Chorus moments — give the silhouette a richer glow */
+body.styx-playing.chorus-active .sil-layer.active {
+    filter:
+        drop-shadow(0 0 40px hsla(320, 100%, 70%, 0.6))
+        drop-shadow(0 0 90px hsla(220, 100%, 60%, 0.5));
 }
