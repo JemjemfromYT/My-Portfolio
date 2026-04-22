@@ -1091,6 +1091,86 @@
 
 <audio id="styx-audio" preload="auto"></audio>
 
+<!-- ============================================
+     SACRED TORCH MODE - Intro Video + Brass Lantern Scene + Lyrics
+     Only visible when "The Sacred Torch" is playing
+     ============================================ -->
+<div id="sacred-torch-video-wrap" aria-hidden="true">
+    <video id="sacred-torch-video" muted playsinline preload="auto">
+        <source src="The_Paraway_Paladin.mp4" type="video/mp4">
+    </video>
+    <div class="st-video-vignette"></div>
+</div>
+
+<div id="sacred-torch-scene" aria-hidden="true">
+    <div class="st-bg-glow"></div>
+    <div class="st-particles">
+        <span class="st-ember st-ember-1"></span>
+        <span class="st-ember st-ember-2"></span>
+        <span class="st-ember st-ember-3"></span>
+        <span class="st-ember st-ember-4"></span>
+        <span class="st-ember st-ember-5"></span>
+        <span class="st-ember st-ember-6"></span>
+        <span class="st-ember st-ember-7"></span>
+        <span class="st-ember st-ember-8"></span>
+        <span class="st-ember st-ember-9"></span>
+        <span class="st-ember st-ember-10"></span>
+        <span class="st-ember st-ember-11"></span>
+        <span class="st-ember st-ember-12"></span>
+    </div>
+
+    <!-- Brass hanging lantern (matches the reference image) -->
+    <div class="st-lantern-wrap">
+        <div class="st-lantern-halo"></div>
+        <div class="st-lantern">
+            <!-- Top wire handle (rounded-arch shape) -->
+            <div class="st-lantern-wire">
+                <div class="st-wire-arch"></div>
+                <div class="st-wire-left"></div>
+                <div class="st-wire-right"></div>
+            </div>
+            <!-- Brass cap / chimney roof (dome with finial) -->
+            <div class="st-lantern-cap">
+                <div class="st-cap-finial"></div>
+                <div class="st-cap-dome"></div>
+                <div class="st-cap-vents"></div>
+                <div class="st-cap-rim"></div>
+            </div>
+            <!-- Brass side bars holding the glass -->
+            <div class="st-side-bar st-side-bar-left"></div>
+            <div class="st-side-bar st-side-bar-right"></div>
+            <!-- Glass globe with fairy-light filaments -->
+            <div class="st-lantern-globe">
+                <div class="st-globe-shine"></div>
+                <div class="st-fairy-lights">
+                    <span class="st-fl st-fl-1"></span>
+                    <span class="st-fl st-fl-2"></span>
+                    <span class="st-fl st-fl-3"></span>
+                    <span class="st-fl st-fl-4"></span>
+                    <span class="st-fl st-fl-5"></span>
+                    <span class="st-fl st-fl-6"></span>
+                    <span class="st-fl st-fl-7"></span>
+                    <span class="st-fl st-fl-8"></span>
+                </div>
+                <div class="st-globe-inner-glow"></div>
+            </div>
+            <!-- Brass base -->
+            <div class="st-lantern-base">
+                <div class="st-base-top"></div>
+                <div class="st-base-mid"></div>
+                <div class="st-base-button"></div>
+                <div class="st-base-bottom"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Sacred Torch lyrics overlay: kept OUTSIDE the background scene so it stays above portfolio sections -->
+<div id="sacred-torch-lyrics" class="st-lyrics-container" aria-hidden="true">
+    <div id="sacred-torch-lyrics-text" class="st-lyrics-text"></div>
+</div>
+
 <!-- Sticky Scrollable Section Nav -->
 <div class="section-nav-bar">
     <div class="section-nav-inner">
@@ -1134,6 +1214,21 @@
                     </div>
                     <div id="admin-indicator" class="hidden mt-5 bg-red-500 text-white px-5 py-1.5 rounded-full text-xs font-bold border border-red-400 shadow-lg animate-pulse inline-block">
                         SYSTEM OVERRIDE ACTIVE
+                    </div>
+                    <!-- ADMIN-ONLY: Storage usage tracker (free tier 1GB) -->
+                    <div id="storage-tracker" class="hidden mt-4 w-full max-w-sm bg-white/85 backdrop-blur-md border border-slate-200 rounded-xl p-3 shadow-md">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[10px] font-black uppercase tracking-widest text-slate-700">Cloud Storage</span>
+                            <button id="storage-refresh-btn" title="Refresh" class="text-slate-500 hover:text-slate-800 text-xs font-bold">&#x21bb;</button>
+                        </div>
+                        <div class="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                            <div id="storage-bar" class="h-full bg-gradient-to-r from-emerald-400 via-sky-500 to-violet-500 transition-all duration-700" style="width:0%"></div>
+                        </div>
+                        <div class="flex justify-between mt-1.5 text-[10px] font-semibold text-slate-600">
+                            <span id="storage-used-label">— MB used</span>
+                            <span id="storage-pct-label">0% of 1 GB</span>
+                        </div>
+                        <div id="storage-files-label" class="text-[9px] text-slate-400 mt-1">— files</div>
                     </div>
                 </div>
             </div>
@@ -1364,6 +1459,45 @@
                 <button type="submit" class="flex-1 glossy-btn py-3 rounded-xl font-bold tracking-widest uppercase">Save</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Social Picker Modal (multi-account) -->
+<div id="social-picker-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md hidden items-center justify-center z-[450] p-6">
+    <div class="glass-card max-w-md w-full p-6 bg-white relative">
+        <div class="flex justify-between items-center mb-5">
+            <h3 id="social-picker-title" class="text-xl font-extrabold text-slate-800">Choose account</h3>
+            <button onclick="closeSocialPicker()" class="text-slate-500 hover:text-slate-800 text-3xl font-bold leading-none">&times;</button>
+        </div>
+        <div id="social-picker-list" class="flex flex-col gap-3"></div>
+    </div>
+</div>
+
+<!-- Social Edit Modal (admin: switch single/multi) -->
+<div id="social-edit-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md hidden items-center justify-center z-[450] p-6">
+    <div class="glass-card max-w-lg w-full p-6 bg-white relative max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-xl font-extrabold text-slate-800">Edit social container</h3>
+            <button onclick="closeSocialEdit()" class="text-slate-500 hover:text-slate-800 text-3xl font-bold leading-none">&times;</button>
+        </div>
+        <div class="space-y-4">
+            <div class="flex gap-2 bg-slate-100 p-1 rounded-xl">
+                <button type="button" id="social-mode-single" onclick="setSocialMode('single')" class="flex-1 py-2 rounded-lg font-bold text-sm transition-colors">Single Link</button>
+                <button type="button" id="social-mode-multi" onclick="setSocialMode('multi')" class="flex-1 py-2 rounded-lg font-bold text-sm transition-colors">Multiple Accounts</button>
+            </div>
+            <div id="social-single-pane">
+                <label class="block text-xs font-bold text-sky-800 mb-1 uppercase tracking-wider">Profile Link</label>
+                <input type="url" id="social-edit-link" class="w-full bg-white border border-slate-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-sky-400 font-medium">
+            </div>
+            <div id="social-multi-pane" class="hidden space-y-3">
+                <div id="social-accounts-list" class="space-y-2"></div>
+                <button type="button" onclick="addSocialAccountRow()" class="w-full text-xs bg-sky-50 hover:bg-sky-100 text-sky-700 py-2 rounded-lg font-bold uppercase tracking-widest border border-sky-200">+ Add account</button>
+            </div>
+            <div class="flex gap-3 pt-4">
+                <button type="button" onclick="closeSocialEdit()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold">Cancel</button>
+                <button type="button" onclick="saveSocialEdit()" class="flex-1 glossy-btn py-3 rounded-xl font-bold tracking-widest uppercase">Save</button>
+            </div>
+        </div>
     </div>
 </div>
 
