@@ -437,7 +437,8 @@ async function loadPortfolio() {
     renderHobbies(hobbies || []);
 
     const { data: socials } = await db.from('socials').select('*');
-    renderSocials(socials || []);
+    socialsCache = socials || [];
+    renderSocials(socialsCache);
 }
 
 async function toggleVisibility(tableName, categoryValue, currentStatus, colName) {
@@ -614,6 +615,7 @@ function renderHobbies(hobbies) {
                                 <img loading="lazy" decoding="async" data-src="${h.cover_image}" class="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-110">
                                 <div class="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
                                 <span class="absolute top-2 left-2 bg-white/95 text-emerald-800 text-[10px] px-3 py-1 rounded-md font-black shadow-sm backdrop-blur-md border border-white uppercase tracking-widest">RANK #${h.rank}</span>
+                                ${isAdmin ? `<button onclick="event.stopPropagation(); editHobbyRank('${h.id}', ${h.rank || 0})" class="absolute bottom-2 left-2 bg-emerald-500/95 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs shadow-md border border-emerald-400 font-bold z-10 hover:bg-emerald-600" title="Edit Rank">&#9650;</button>` : ''}
                                 ${isAdmin ? `<button onclick="deleteItem('hobbies', '${h.id}')" class="absolute top-2 right-2 bg-red-500/90 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs shadow-md border border-red-400 font-bold z-10 hover:bg-red-600 backdrop-blur-sm">&#x2715;</button>` : ''}
                             </div>
                             <div class="flex flex-col mt-5 gap-3">
@@ -640,22 +642,39 @@ function renderSocials(socials) {
     if (!socialBox) return;
     if (!socials || socials.length === 0) return socialBox.innerHTML = "<p class='text-sky-700/60 font-bold ml-4'>No links found.</p>";
 
-    socialBox.innerHTML = socials.map(s => `
-        <div class="relative w-full sm:w-[340px] group">
-            <a href="${s.link}" target="_blank" class="flex items-center gap-5 glass-card p-5 rounded-2xl transition-all duration-300 hover:scale-105 relative overflow-hidden bg-white/70">
+    socialBox.innerHTML = socials.map(s => {
+        const isMulti = s.mode === 'multi' && Array.isArray(s.accounts) && s.accounts.length > 0;
+        const previewText = isMulti
+            ? `${s.accounts.length} accounts`
+            : (s.link || '').replace(/^https?:\/\//, '');
+        const clickHandler = isMulti
+            ? `onclick="openSocialPicker('${s.id}')"`
+            : '';
+        const tag = isMulti ? 'div' : 'a';
+        const tagAttrs = isMulti
+            ? `class="flex items-center gap-5 glass-card p-5 rounded-2xl transition-all duration-300 hover:scale-105 relative overflow-hidden bg-white/70 cursor-pointer" ${clickHandler}`
+            : `href="${s.link}" target="_blank" class="flex items-center gap-5 glass-card p-5 rounded-2xl transition-all duration-300 hover:scale-105 relative overflow-hidden bg-white/70"`;
+        return `
+        <div class="relative w-full sm:w-[340px] group" data-social-id="${s.id}">
+            <${tag} ${tagAttrs}>
                 <div class="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/90 to-transparent pointer-events-none"></div>
                 <div class="relative w-14 h-14 rounded-xl overflow-hidden shadow-md border border-white flex-shrink-0 bg-white">
                     <img loading="lazy" decoding="async" data-src="${s.image_url}" class="w-full h-full object-cover">
                 </div>
                 <div class="flex flex-col overflow-hidden relative z-10">
                     <span class="font-extrabold text-slate-800 truncate text-lg tracking-tight">${s.platform}</span>
-                    <span class="text-xs text-sky-600 font-bold truncate tracking-wider uppercase opacity-80">${s.link.replace(/^https?:\/\//, '')}</span>
+                    <span class="text-xs text-sky-600 font-bold truncate tracking-wider uppercase opacity-80">${previewText}</span>
                 </div>
-            </a>
-            ${isAdmin ? `<button onclick="deleteItem('socials', '${s.id}')" class="absolute -top-3 -right-3 bg-red-500/90 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs shadow-lg border border-red-400 font-bold z-20 hover:bg-red-600 backdrop-blur-sm">&#x2715;</button>` : ''}
-        </div>
-    `).join('');
+                ${isMulti ? '<span class="ml-auto relative z-10 text-xs font-black text-sky-700 bg-sky-50 border border-sky-200 px-2 py-1 rounded-full uppercase tracking-widest">Multi</span>' : ''}
+            </${tag}>
+            ${isAdmin ? `<button onclick="event.stopPropagation(); openSocialEdit('${s.id}')" class="absolute -top-3 -left-3 bg-sky-500/95 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs shadow-lg border border-sky-400 font-bold z-20 hover:bg-sky-600" title="Edit links">&#9998;</button>` : ''}
+            ${isAdmin ? `<button onclick="event.stopPropagation(); deleteItem('socials', '${s.id}')" class="absolute -top-3 -right-3 bg-red-500/90 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs shadow-lg border border-red-400 font-bold z-20 hover:bg-red-600 backdrop-blur-sm">&#x2715;</button>` : ''}
+        </div>`;
+    }).join('');
 }
+
+// Cache socials so picker/edit modals can read them without an extra fetch.
+let socialsCache = [];
 
 function toggleViewAll(btn, wrapper, defaultLabel) {
     if (!wrapper || !btn) return;
@@ -771,11 +790,13 @@ notifYes.addEventListener('click', () => {
 });
 
 notifSubmit.addEventListener('click', () => {
-    if (notifPinInput.value === "2026") {
+    if (notifPinInput.value === "2027") {
         isAdmin = true;
         adminIndicator.classList.remove('hidden');
+        document.getElementById('storage-tracker')?.classList.remove('hidden');
         [addProjectBtn, addCertBtn, addHobbyBtn, addSocialBtn, editProfileBtn, editQuoteBtn, editWisdomBtn, addMusicBtn].forEach(btn => btn?.classList.remove('hidden'));
         loadPortfolio();
+        loadStorageUsage();
         closeSystemNotif();
     } else {
         notifPinInput.value = "";
@@ -784,6 +805,60 @@ notifSubmit.addEventListener('click', () => {
         setTimeout(() => notifPinInput.classList.remove('animate-pulse', 'border-red-500', 'text-red-500'), 500);
     }
 });
+
+/* ===== ADMIN: Cloud storage usage tracker (free tier 1GB) ===== */
+const STORAGE_BUCKET = 'portfolio-assets';
+const FREE_TIER_BYTES = 1024 * 1024 * 1024; // 1 GB
+
+async function listAllFiles(path = '', acc = []) {
+    let offset = 0;
+    while (true) {
+        const { data, error } = await db.storage.from(STORAGE_BUCKET).list(path, {
+            limit: 100, offset, sortBy: { column: 'name', order: 'asc' }
+        });
+        if (error || !data) break;
+        for (const item of data) {
+            // A "folder" entry from supabase has no metadata/id
+            if (item.id === null || (!item.metadata && item.name && !item.name.includes('.'))) {
+                const sub = path ? `${path}/${item.name}` : item.name;
+                await listAllFiles(sub, acc);
+            } else {
+                acc.push(item);
+            }
+        }
+        if (data.length < 100) break;
+        offset += 100;
+    }
+    return acc;
+}
+
+async function loadStorageUsage() {
+    const bar = document.getElementById('storage-bar');
+    const usedLbl = document.getElementById('storage-used-label');
+    const pctLbl = document.getElementById('storage-pct-label');
+    const filesLbl = document.getElementById('storage-files-label');
+    if (!bar || !usedLbl || !pctLbl || !filesLbl) return;
+    usedLbl.textContent = 'Calculating…';
+    try {
+        const files = await listAllFiles('');
+        let total = 0;
+        for (const f of files) total += (f.metadata?.size || 0);
+        const mb = total / (1024 * 1024);
+        const pct = Math.min(100, (total / FREE_TIER_BYTES) * 100);
+        bar.style.width = pct.toFixed(2) + '%';
+        usedLbl.textContent = `${mb.toFixed(2)} MB used`;
+        pctLbl.textContent = `${pct.toFixed(1)}% of 1 GB`;
+        filesLbl.textContent = `${files.length} file${files.length === 1 ? '' : 's'} in “${STORAGE_BUCKET}”`;
+        if (pct >= 85) bar.style.background = 'linear-gradient(to right,#f87171,#dc2626)';
+        else if (pct >= 60) bar.style.background = 'linear-gradient(to right,#fbbf24,#f97316)';
+        else bar.style.background = '';
+    } catch (e) {
+        usedLbl.textContent = 'Error loading';
+        console.warn('[storage tracker]', e);
+    }
+}
+
+document.getElementById('storage-refresh-btn')?.addEventListener('click', loadStorageUsage);
 
 function closeSystemNotif() {
     systemBox.classList.remove('scale-100', 'opacity-100');
@@ -918,15 +993,26 @@ window.openGallery = async function(hobbyId, title, coverImgUrl) {
     document.getElementById('gallery-modal').classList.remove('hidden');
     document.getElementById('gallery-modal').classList.add('flex');
 
-    const { data: extraImages } = await db.from('hobby_gallery').select('image_url').eq('hobby_id', hobbyId);
+    const { data: extraImages } = await db.from('hobby_gallery').select('id, image_url, media_type').eq('hobby_id', hobbyId);
     if (extraImages) extraImages.forEach(img => {
         const url = img.image_url || '';
-        const isVideo = /\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(url);
+        const isVideo = (img.media_type === 'video') || /\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(url);
         const media = isVideo
             ? `<video src="${url}" controls playsinline class="max-h-96 w-auto rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.1)] border border-white/20 bg-black"></video>`
             : `<img loading="lazy" decoding="async" data-src="${url}" class="max-h-96 w-auto rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.1)] border border-white/20">`;
-        imgContainer.innerHTML += `<div class="relative group cursor-pointer hover:scale-105 transition-transform duration-300">${media}</div>`;
+        const adminDel = isAdmin ? `<button onclick="deleteGalleryItem('${img.id}', '${hobbyId}', '${h_safeTitle(title)}', '${coverImgUrl}')" class="absolute top-2 right-2 bg-red-500/95 text-white rounded-full w-9 h-9 flex items-center justify-center text-base shadow-lg border border-red-400 font-bold z-20 hover:bg-red-600">&#x2715;</button>` : '';
+        imgContainer.innerHTML += `<div class="relative group cursor-pointer hover:scale-105 transition-transform duration-300">${media}${adminDel}</div>`;
     });
+}
+
+function h_safeTitle(t) { return (t || '').replace(/'/g, "\\'"); }
+
+window.deleteGalleryItem = async function(galleryId, hobbyId, title, coverImgUrl) {
+    if (!confirm('Delete this media from the gallery?')) return;
+    const { error } = await db.from('hobby_gallery').delete().eq('id', galleryId);
+    if (error) return alert('Error: ' + error.message);
+    // Refresh gallery view in place
+    openGallery(hobbyId, title, coverImgUrl);
 }
 
 const galleryInput = document.getElementById('gallery-upload-input');
@@ -941,7 +1027,8 @@ if (galleryInput) {
         const fileName = `gallery/${Date.now()}-${safeName}`;
         await db.storage.from('portfolio-assets').upload(fileName, file, { contentType: file.type });
         const { data: urlData } = db.storage.from('portfolio-assets').getPublicUrl(fileName);
-        await db.from('hobby_gallery').insert([{ hobby_id: currentHobbyId, image_url: urlData.publicUrl }]);
+        const mediaType = (file.type || '').startsWith('video/') ? 'video' : 'image';
+        await db.from('hobby_gallery').insert([{ hobby_id: currentHobbyId, image_url: urlData.publicUrl, media_type: mediaType }]);
         loadPortfolio();
         closeGallery();
     };
@@ -1118,28 +1205,180 @@ if (wisdomForm) {
 // Play music function
 window.playMusic = function(id, audioUrl, title) {
     currentPlayingMusic = { id, audioUrl, title };
-    
+
+    if (!audioUrl) {
+        alert(`No audio file is set for "${title}". Please upload an audio file for this track in admin mode.`);
+        return;
+    }
+
     // Check if it's Styx Helix
     const isStyxHelix = title.toLowerCase().includes('styx') || title.toLowerCase().includes('helix');
-    
+
+    const isSacredTorch = title.toLowerCase().includes('sacred torch');
+
+    // Strict mode isolation: leaving one special mode fully removes its effects
+    if (!isStyxHelix && isStyxHelixMode) {
+        deactivateStyxHelixMode();
+    }
+    if (!isSacredTorch && isSacredTorchMode) {
+        deactivateSacredTorchMode();
+    }
+    // Never allow both at once
+    if (isStyxHelix && isSacredTorchMode) deactivateSacredTorchMode();
+    if (isSacredTorch && isStyxHelixMode) deactivateStyxHelixMode();
+
     // Set audio source
+    try { styxAudio.pause(); } catch (e) {}
     styxAudio.src = audioUrl;
     styxAudio.load();
-    
+
     // Update player bar
     musicTitle.textContent = title;
     musicPlayerBar.classList.add('active');
-    
+
     // Start playback
     styxAudio.play().then(() => {
         playIcon.innerHTML = '&#10074;&#10074;'; // Pause icon
-        
         if (isStyxHelix) {
             activateStyxHelixMode();
+        } else if (isSacredTorch) {
+            activateSacredTorchMode();
         }
     }).catch(err => {
-        console.log('Playback error:', err);
+        console.error('Playback error for', title, audioUrl, err);
+        alert(`Could not play "${title}". ${err.message || 'Check that the audio URL is valid and publicly accessible.'}`);
     });
+}
+
+// ============================================
+// SACRED TORCH MODE - Brass Lantern + Intro Video + Lyrics
+// ============================================
+let isSacredTorchMode = false;
+let sacredTorchAnimFrame = null;
+let lastSacredLyricIndex = -1;
+let sacredVideoFadeTimer = null;
+let sacredVideoHideTimer = null;
+
+const SACRED_TORCH_LYRICS = [
+    // English/romaji intro (BOLD/Epic style)
+    { time: 0.00,   text: "MICHIIYUKI WO TERASU RUUMEN",                                  style: "romaji" },
+    { time: 11.50,  text: "KOKO DE MEZAME IMI WO MUKUI NO YOU NI OMOTTETA",                style: "romaji" },
+    { time: 17.00,  text: "ANO HI NO KESHIKI GA SUBETE WO KAETA",                          style: "romaji" },
+    { time: 22.00,  text: "TATOE SAKI GA MIEZU KURAYAMI NI NOMARETE MO",                   style: "romaji" },
+    { time: 27.50,  text: "ANO TOKI ATAETE KURETA MONO GA KOKO NI ARU",                    style: "romaji" },
+
+    // Japanese verses
+    { time: 39.00,  text: "言葉だけに頼ることは危険",            style: "japanese" },
+    { time: 43.50,  text: "力任せにならないように",              style: "japanese" },
+    { time: 47.00,  text: "しかと自分を見つめて立てたら",        style: "japanese" },
+    { time: 51.50,  text: "戦える",                              style: "japanese" },
+
+    { time: 54.00,  text: "生きたいと望み 祈って",               style: "japanese" },
+    { time: 59.00,  text: "果たすと誓ったから",                  style: "japanese" },
+    { time: 64.00,  text: "立ち向かう 絶望の道でも",             style: "japanese" },
+    { time: 69.50,  text: "進み続ける",                          style: "japanese" },
+    { time: 72.00,  text: "守りたい 大事なものを",               style: "japanese" },
+    { time: 77.00,  text: "心を奮い立たせ",                      style: "japanese" },
+    { time: 80.50,  text: "目を逸らさない 怯まない",             style: "japanese" },
+    { time: 83.50,  text: "意思を曲げず 踏み出せ",               style: "japanese" },
+];
+
+
+function activateSacredTorchMode() {
+    if (isSacredTorchMode) return;
+    isSacredTorchMode = true;
+    lastSacredLyricIndex = -1;
+
+    document.body.classList.add('sacred-torch-playing');
+
+    const scene = document.getElementById('sacred-torch-scene');
+    const lyrics = document.getElementById('sacred-torch-lyrics');
+    const videoWrap = document.getElementById('sacred-torch-video-wrap');
+    const video = document.getElementById('sacred-torch-video');
+
+    scene?.classList.add('active');
+    lyrics?.classList.add('active');
+
+    // Play intro video, synced with audio start; fade out at ~9s
+    if (videoWrap && video) {
+        videoWrap.classList.remove('fading-out');
+        videoWrap.classList.add('active');
+        try {
+            video.currentTime = 0;
+            video.muted = true;
+            video.play().catch(() => {});
+        } catch (e) {}
+
+        clearTimeout(sacredVideoFadeTimer);
+        clearTimeout(sacredVideoHideTimer);
+        sacredVideoFadeTimer = setTimeout(() => {
+            videoWrap.classList.add('fading-out');
+        }, 9000);
+        sacredVideoHideTimer = setTimeout(() => {
+            videoWrap.classList.remove('active', 'fading-out');
+            try { video.pause(); } catch (e) {}
+        }, 11000);
+    }
+
+    startSacredLyricsSync();
+}
+
+function deactivateSacredTorchMode() {
+    if (!isSacredTorchMode) return;
+    isSacredTorchMode = false;
+    lastSacredLyricIndex = -1;
+
+    document.body.classList.remove('sacred-torch-playing');
+
+    const scene = document.getElementById('sacred-torch-scene');
+    const lyrics = document.getElementById('sacred-torch-lyrics');
+    const lyricsText = document.getElementById('sacred-torch-lyrics-text');
+    const videoWrap = document.getElementById('sacred-torch-video-wrap');
+    const video = document.getElementById('sacred-torch-video');
+
+    scene?.classList.remove('active');
+    lyrics?.classList.remove('active');
+    if (lyricsText) {
+        lyricsText.textContent = '';
+        lyricsText.className = 'st-lyrics-text';
+    }
+
+    clearTimeout(sacredVideoFadeTimer);
+    clearTimeout(sacredVideoHideTimer);
+    if (videoWrap) videoWrap.classList.remove('active', 'fading-out');
+    if (video) { try { video.pause(); video.currentTime = 0; } catch (e) {} }
+
+    if (sacredTorchAnimFrame) {
+        cancelAnimationFrame(sacredTorchAnimFrame);
+        sacredTorchAnimFrame = null;
+    }
+}
+
+function startSacredLyricsSync() {
+    const lyricsText = document.getElementById('sacred-torch-lyrics-text');
+    if (!lyricsText || !styxAudio) return;
+
+    const tick = () => {
+        if (!isSacredTorchMode) return;
+        const t = styxAudio.currentTime || 0;
+        let activeIdx = -1;
+        for (let i = 0; i < SACRED_TORCH_LYRICS.length; i++) {
+            if (t >= SACRED_TORCH_LYRICS[i].time) activeIdx = i;
+            else break;
+        }
+        if (activeIdx !== lastSacredLyricIndex && activeIdx >= 0) {
+            lastSacredLyricIndex = activeIdx;
+            const line = SACRED_TORCH_LYRICS[activeIdx];
+            lyricsText.className = 'st-lyrics-text st-' + line.type;
+            lyricsText.textContent = line.text;
+            lyricsText.style.animation = 'none';
+            // force reflow then re-trigger
+            void lyricsText.offsetWidth;
+            lyricsText.style.animation = '';
+        }
+        sacredTorchAnimFrame = requestAnimationFrame(tick);
+    };
+    sacredTorchAnimFrame = requestAnimationFrame(tick);
 }
 
 // Activate the special Styx Helix mode - OPTIMIZED for background play
@@ -1561,17 +1800,18 @@ if (styxAudio) {
     
     styxAudio.addEventListener('ended', () => {
         playIcon.innerHTML = '&#9654;';
-        if (isStyxHelixMode) {
-            deactivateStyxHelixMode();
-        }
+        if (isStyxHelixMode) deactivateStyxHelixMode();
+        if (isSacredTorchMode) deactivateSacredTorchMode();
         // Loop the music for continuous background play
         if (currentPlayingMusic) {
             styxAudio.currentTime = 0;
             styxAudio.play().then(() => {
                 playIcon.innerHTML = '&#10074;&#10074;';
-                if (currentPlayingMusic.title.toLowerCase().includes('styx') || 
-                    currentPlayingMusic.title.toLowerCase().includes('helix')) {
+                const t = (currentPlayingMusic.title || '').toLowerCase();
+                if (t.includes('styx') || t.includes('helix')) {
                     activateStyxHelixMode();
+                } else if (t.includes('sacred torch')) {
+                    activateSacredTorchMode();
                 }
             }).catch(() => {});
         }
@@ -1606,6 +1846,7 @@ if (musicStop) {
         playIcon.innerHTML = '&#9654;';
         musicPlayerBar.classList.remove('active');
         if (isStyxHelixMode) deactivateStyxHelixMode();
+        if (isSacredTorchMode) deactivateSacredTorchMode();
     });
 }
 
@@ -1619,6 +1860,7 @@ if (musicCloseX) {
         playIcon.innerHTML = '&#9654;';
         musicPlayerBar.classList.remove('active');
         if (isStyxHelixMode) deactivateStyxHelixMode();
+        if (isSacredTorchMode) deactivateSacredTorchMode();
     });
 }
 
@@ -1707,8 +1949,8 @@ document.addEventListener('keydown', (e) => {
         playIcon.innerHTML = '&#9654;';
         musicPlayerBar.classList.remove('active');
         if (isStyxHelixMode) deactivateStyxHelixMode();
+        if (isSacredTorchMode) deactivateSacredTorchMode();
     }
-    // Space to play/pause (when not in input)
     if (e.key === ' ' && !e.target.matches('input, textarea')) {
         e.preventDefault();
         if (styxAudio.paused) {
@@ -1766,3 +2008,151 @@ document.addEventListener('DOMContentLoaded', () => {
     mo.observe(document.body, { childList:true, subtree:true });
   });
 })();
+
+// ============================================
+// HOBBY RANK EDIT (admin)
+// ============================================
+window.editHobbyRank = async function(hobbyId, currentRank) {
+    const newRank = prompt('Update rank for this interest (lower number = higher priority):', currentRank);
+    if (newRank === null) return;
+    const parsed = parseInt(newRank, 10);
+    if (Number.isNaN(parsed)) return alert('Please enter a valid number.');
+    const { error } = await db.from('hobbies').update({ rank: parsed }).eq('id', hobbyId);
+    if (error) return alert('Error: ' + error.message);
+    loadPortfolio();
+};
+
+// ============================================
+// SOCIAL PICKER (viewer) — opens when a multi-account container is clicked
+// ============================================
+window.openSocialPicker = function(socialId) {
+    const social = socialsCache.find(s => s.id === socialId);
+    if (!social) return;
+    document.getElementById('social-picker-title').textContent = social.platform;
+    const list = document.getElementById('social-picker-list');
+    const accounts = Array.isArray(social.accounts) ? social.accounts : [];
+    if (accounts.length === 0) {
+        list.innerHTML = '<p class="text-slate-500 italic text-sm">No accounts configured.</p>';
+    } else {
+        list.innerHTML = accounts.map(acc => `
+            <a href="${acc.link}" target="_blank" rel="noopener" class="flex items-center justify-between gap-4 p-4 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-colors">
+                <div class="flex flex-col overflow-hidden">
+                    <span class="font-extrabold text-slate-800 truncate">${acc.name || 'Account'}</span>
+                    <span class="text-xs text-sky-700 truncate">${(acc.link || '').replace(/^https?:\/\//, '')}</span>
+                </div>
+                <span class="text-sky-600 font-bold">&rarr;</span>
+            </a>
+        `).join('');
+    }
+    const modal = document.getElementById('social-picker-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+};
+
+window.closeSocialPicker = function() {
+    const modal = document.getElementById('social-picker-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+};
+
+// ============================================
+// SOCIAL EDIT (admin) — switch single ↔ multi, manage accounts
+// ============================================
+let editingSocialId = null;
+let editingSocialMode = 'single';
+
+window.openSocialEdit = function(socialId) {
+    const social = socialsCache.find(s => s.id === socialId);
+    if (!social) return;
+    editingSocialId = socialId;
+    editingSocialMode = social.mode === 'multi' ? 'multi' : 'single';
+    document.getElementById('social-edit-link').value = social.link || '';
+    const accounts = Array.isArray(social.accounts) && social.accounts.length > 0
+        ? social.accounts
+        : [{ name: '', link: '' }];
+    renderSocialAccountsEditor(accounts);
+    applySocialModeUI();
+    const modal = document.getElementById('social-edit-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+};
+
+window.closeSocialEdit = function() {
+    editingSocialId = null;
+    const modal = document.getElementById('social-edit-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+};
+
+window.setSocialMode = function(mode) {
+    editingSocialMode = mode;
+    applySocialModeUI();
+};
+
+function applySocialModeUI() {
+    const single = document.getElementById('social-single-pane');
+    const multi = document.getElementById('social-multi-pane');
+    const btnS = document.getElementById('social-mode-single');
+    const btnM = document.getElementById('social-mode-multi');
+    const activeCls = ['bg-white', 'text-sky-700', 'shadow'];
+    const idleCls = ['text-slate-500'];
+    [btnS, btnM].forEach(b => { activeCls.forEach(c => b.classList.remove(c)); idleCls.forEach(c => b.classList.remove(c)); });
+    if (editingSocialMode === 'single') {
+        single.classList.remove('hidden'); multi.classList.add('hidden');
+        activeCls.forEach(c => btnS.classList.add(c));
+        idleCls.forEach(c => btnM.classList.add(c));
+    } else {
+        single.classList.add('hidden'); multi.classList.remove('hidden');
+        activeCls.forEach(c => btnM.classList.add(c));
+        idleCls.forEach(c => btnS.classList.add(c));
+    }
+}
+
+function renderSocialAccountsEditor(accounts) {
+    const list = document.getElementById('social-accounts-list');
+    list.innerHTML = '';
+    accounts.forEach((acc, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex gap-2 items-center bg-slate-50 p-2 rounded-xl border border-slate-200';
+        row.innerHTML = `
+            <input type="text" placeholder="Custom name (e.g. Personal)" value="${(acc.name || '').replace(/"/g, '&quot;')}" class="social-acc-name flex-1 min-w-0 bg-white border border-slate-200 p-2 rounded-lg text-sm font-medium" />
+            <input type="url" placeholder="https://..." value="${(acc.link || '').replace(/"/g, '&quot;')}" class="social-acc-link flex-1 min-w-0 bg-white border border-slate-200 p-2 rounded-lg text-sm font-medium" />
+            <button type="button" class="bg-red-500 text-white rounded-lg w-8 h-8 flex items-center justify-center text-xs font-bold hover:bg-red-600">&times;</button>
+        `;
+        row.querySelector('button').onclick = () => row.remove();
+        list.appendChild(row);
+    });
+}
+
+window.addSocialAccountRow = function() {
+    const list = document.getElementById('social-accounts-list');
+    const current = collectSocialAccountsFromUI();
+    current.push({ name: '', link: '' });
+    renderSocialAccountsEditor(current);
+};
+
+function collectSocialAccountsFromUI() {
+    const rows = document.querySelectorAll('#social-accounts-list > div');
+    return Array.from(rows).map(r => ({
+        name: r.querySelector('.social-acc-name').value.trim(),
+        link: r.querySelector('.social-acc-link').value.trim()
+    }));
+}
+
+window.saveSocialEdit = async function() {
+    if (!editingSocialId) return;
+    let payload;
+    if (editingSocialMode === 'single') {
+        const link = document.getElementById('social-edit-link').value.trim();
+        if (!link) return alert('Please enter a link.');
+        payload = { mode: 'single', link, accounts: [] };
+    } else {
+        const accounts = collectSocialAccountsFromUI().filter(a => a.link);
+        if (accounts.length === 0) return alert('Add at least one account with a link.');
+        payload = { mode: 'multi', accounts, link: accounts[0].link };
+    }
+    const { error } = await db.from('socials').update(payload).eq('id', editingSocialId);
+    if (error) return alert('Error: ' + error.message);
+    closeSocialEdit();
+    loadPortfolio();
+};

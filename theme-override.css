@@ -200,3 +200,434 @@ body.styx-playing.chorus-active .sil-layer.active {
         drop-shadow(0 0 40px hsla(320, 100%, 70%, 0.6))
         drop-shadow(0 0 90px hsla(220, 100%, 60%, 0.5));
 }
+
+/* ============================================
+   THE SACRED TORCH — Brass Hanging Lantern Mode
+   Effects only apply when body has .sacred-torch-playing
+   ============================================ */
+
+/* ---------- Intro video overlay ---------- */
+#sacred-torch-video-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 1.4s ease;
+}
+#sacred-torch-video-wrap.active {
+    opacity: 1;
+    visibility: visible;
+}
+#sacred-torch-video-wrap.fading-out { opacity: 0; }
+#sacred-torch-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.st-video-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.85) 100%);
+    pointer-events: none;
+}
+
+/* ---------- Sacred Torch background scene ---------- */
+#sacred-torch-scene {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1.6s ease;
+    background:
+        radial-gradient(ellipse at 50% 35%, rgba(255, 180, 80, 0.25) 0%, transparent 55%),
+        radial-gradient(ellipse at 50% 100%, rgba(120, 60, 20, 0.6) 0%, transparent 70%),
+        linear-gradient(180deg, #1a0e06 0%, #2a1608 40%, #3a1d0a 70%, #1a0c04 100%);
+}
+#sacred-torch-scene.active { opacity: 1; }
+
+.st-bg-glow {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 70vmin; height: 70vmin;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255, 200, 100, 0.35) 0%, rgba(255, 140, 40, 0.1) 40%, transparent 70%);
+    filter: blur(40px);
+    animation: st-bg-pulse 5s ease-in-out infinite;
+}
+@keyframes st-bg-pulse {
+    0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+    50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.15); }
+}
+
+/* ---------- Floating embers ---------- */
+.st-particles { position: absolute; inset: 0; overflow: hidden; }
+.st-ember {
+    position: absolute;
+    bottom: -10px;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff3c4 0%, #ffb347 50%, transparent 100%);
+    box-shadow: 0 0 10px #ffaa44, 0 0 20px #ff8800;
+    opacity: 0;
+    animation: st-ember-rise linear infinite;
+}
+@keyframes st-ember-rise {
+    0%   { transform: translateY(0) translateX(0) scale(0.5); opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 0.8; }
+    100% { transform: translateY(-110vh) translateX(var(--st-drift, 30px)) scale(1.2); opacity: 0; }
+}
+.st-ember-1  { left: 8%;  --st-drift:  20px; animation-duration: 9s;  animation-delay: 0s; }
+.st-ember-2  { left: 18%; --st-drift: -25px; animation-duration: 11s; animation-delay: 1.2s; }
+.st-ember-3  { left: 28%; --st-drift:  35px; animation-duration: 8s;  animation-delay: 2.5s; }
+.st-ember-4  { left: 38%; --st-drift: -15px; animation-duration: 12s; animation-delay: 0.5s; }
+.st-ember-5  { left: 48%; --st-drift:  40px; animation-duration: 10s; animation-delay: 3s; }
+.st-ember-6  { left: 58%; --st-drift: -30px; animation-duration: 9.5s;animation-delay: 1.8s; }
+.st-ember-7  { left: 68%; --st-drift:  25px; animation-duration: 11s; animation-delay: 0.8s; }
+.st-ember-8  { left: 78%; --st-drift: -40px; animation-duration: 8.5s;animation-delay: 2.2s; }
+.st-ember-9  { left: 88%; --st-drift:  15px; animation-duration: 10s; animation-delay: 1.5s; }
+.st-ember-10 { left: 14%; --st-drift: -20px; animation-duration: 13s; animation-delay: 4s; }
+.st-ember-11 { left: 54%; --st-drift:  50px; animation-duration: 9s;  animation-delay: 3.5s; }
+.st-ember-12 { left: 84%; --st-drift: -35px; animation-duration: 12s; animation-delay: 2.8s; }
+
+/* ---------- Brass Hanging Lantern ---------- */
+.st-lantern-wrap {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -55%);
+    width: 200px; height: 360px;
+    transform-origin: 50% 0%;
+    animation: st-lantern-sway 5.5s ease-in-out infinite;
+}
+@keyframes st-lantern-sway {
+    0%, 100% { transform: translate(-50%, -55%) rotate(-2deg); }
+    50%      { transform: translate(-50%, -55%) rotate(2deg); }
+}
+
+.st-lantern-halo {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 420px; height: 420px;
+    transform: translate(-50%, -45%);
+    background: radial-gradient(circle, rgba(255, 200, 100, 0.55) 0%, rgba(255, 150, 50, 0.2) 35%, transparent 70%);
+    filter: blur(20px);
+    animation: st-halo-pulse 3.2s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes st-halo-pulse {
+    0%, 100% { opacity: 0.75; transform: translate(-50%, -45%) scale(1); }
+    50%      { opacity: 1;    transform: translate(-50%, -45%) scale(1.08); }
+}
+
+.st-lantern { position: relative; width: 100%; height: 100%; }
+
+/* Top wire handle */
+.st-lantern-wire {
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 60px;
+}
+.st-wire-arch {
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 90px; height: 45px;
+    border: 2.5px solid #c89344;
+    border-bottom: none;
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+    background: transparent;
+    box-shadow: inset 0 2px 0 rgba(255,220,160,0.4);
+}
+.st-wire-left, .st-wire-right {
+    position: absolute;
+    top: 30px;
+    width: 2.5px; height: 35px;
+    background: linear-gradient(180deg, #c89344, #8b5a2b);
+    border-radius: 2px;
+}
+.st-wire-left  { left: 18px; transform: rotate(-15deg); }
+.st-wire-right { right: 18px; transform: rotate(15deg); }
+
+/* Brass cap / chimney */
+.st-lantern-cap {
+    position: absolute;
+    top: 55px; left: 50%;
+    transform: translateX(-50%);
+    width: 130px; height: 70px;
+}
+.st-cap-finial {
+    position: absolute;
+    top: -8px; left: 50%;
+    transform: translateX(-50%);
+    width: 8px; height: 14px;
+    background: linear-gradient(180deg, #f0c060 0%, #b8801f 100%);
+    border-radius: 50% 50% 20% 20%;
+    box-shadow: 0 0 4px rgba(255,200,100,0.6);
+}
+.st-cap-dome {
+    position: absolute;
+    top: 6px; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 32px;
+    background: linear-gradient(180deg, #f5d68a 0%, #d4a04a 35%, #a06820 100%);
+    border-radius: 55% 55% 12% 12% / 100% 100% 12% 12%;
+    box-shadow:
+        inset 0 3px 6px rgba(255,240,200,0.6),
+        inset 0 -4px 8px rgba(80,40,10,0.6),
+        0 4px 10px rgba(0,0,0,0.4);
+}
+.st-cap-vents {
+    position: absolute;
+    top: 36px; left: 50%;
+    transform: translateX(-50%);
+    width: 96px; height: 14px;
+    background:
+        repeating-linear-gradient(90deg,
+            #6b3a10 0px, #6b3a10 3px,
+            #d4a04a 3px, #d4a04a 8px);
+    border-top: 2px solid #8b5a2b;
+    border-bottom: 2px solid #8b5a2b;
+    box-shadow: inset 0 0 6px rgba(0,0,0,0.5);
+}
+.st-cap-rim {
+    position: absolute;
+    top: 52px; left: 50%;
+    transform: translateX(-50%);
+    width: 116px; height: 10px;
+    background: linear-gradient(180deg, #e8b85a 0%, #b07820 50%, #8b5a2b 100%);
+    border-radius: 4px;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,230,180,0.6);
+}
+
+/* Side bars holding the glass globe */
+.st-side-bar {
+    position: absolute;
+    top: 130px;
+    width: 6px; height: 130px;
+    background: linear-gradient(180deg, #c89344 0%, #8b5a2b 50%, #c89344 100%);
+    border-radius: 3px;
+    box-shadow: inset 1px 0 0 rgba(255,230,180,0.5), 0 0 4px rgba(0,0,0,0.5);
+}
+.st-side-bar-left  { left: 18px; }
+.st-side-bar-right { right: 18px; }
+
+/* Glass globe */
+.st-lantern-globe {
+    position: absolute;
+    top: 130px; left: 50%;
+    transform: translateX(-50%);
+    width: 150px; height: 140px;
+    border-radius: 45% 45% 42% 42% / 50% 50% 45% 45%;
+    background:
+        radial-gradient(ellipse at 35% 30%, rgba(255,255,255,0.35) 0%, transparent 35%),
+        radial-gradient(ellipse at center, rgba(255,210,140,0.3) 0%, rgba(255,160,60,0.15) 50%, rgba(180,100,30,0.2) 100%);
+    border: 2px solid rgba(200,147,68,0.5);
+    box-shadow:
+        inset 0 0 30px rgba(255,200,100,0.4),
+        0 0 40px rgba(255,180,80,0.55),
+        0 0 80px rgba(255,140,40,0.35);
+    overflow: hidden;
+    backdrop-filter: blur(1px);
+}
+.st-globe-shine {
+    position: absolute;
+    top: 8%; left: 12%;
+    width: 30%; height: 50%;
+    background: linear-gradient(135deg, rgba(255,255,255,0.45), transparent 70%);
+    border-radius: 50%;
+    filter: blur(3px);
+}
+.st-globe-inner-glow {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%; height: 80%;
+    background: radial-gradient(circle, rgba(255,235,180,0.5) 0%, transparent 65%);
+    animation: st-flame-pulse 2.4s ease-in-out infinite;
+    border-radius: 50%;
+}
+@keyframes st-flame-pulse {
+    0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+    50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.1); }
+}
+
+/* Fairy-light filaments inside globe */
+.st-fairy-lights { position: absolute; inset: 0; }
+.st-fl {
+    position: absolute;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #fff5d4;
+    box-shadow: 0 0 8px #ffd76a, 0 0 14px #ffaa44, 0 0 20px rgba(255,170,68,0.6);
+    animation: st-fl-twinkle 1.8s ease-in-out infinite;
+}
+@keyframes st-fl-twinkle {
+    0%, 100% { opacity: 0.3; transform: scale(0.7); }
+    50%      { opacity: 1;   transform: scale(1.2); }
+}
+.st-fl-1 { top: 25%; left: 30%; animation-delay: 0s; }
+.st-fl-2 { top: 40%; left: 55%; animation-delay: 0.3s; }
+.st-fl-3 { top: 30%; left: 70%; animation-delay: 0.6s; }
+.st-fl-4 { top: 55%; left: 25%; animation-delay: 0.9s; }
+.st-fl-5 { top: 60%; left: 60%; animation-delay: 1.2s; }
+.st-fl-6 { top: 70%; left: 40%; animation-delay: 0.4s; }
+.st-fl-7 { top: 45%; left: 40%; animation-delay: 0.8s; }
+.st-fl-8 { top: 50%; left: 75%; animation-delay: 1.5s; }
+
+/* Brass base */
+.st-lantern-base {
+    position: absolute;
+    top: 270px; left: 50%;
+    transform: translateX(-50%);
+    width: 130px; height: 70px;
+}
+.st-base-top {
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 116px; height: 10px;
+    background: linear-gradient(180deg, #e8b85a 0%, #b07820 50%, #8b5a2b 100%);
+    border-radius: 4px;
+    box-shadow: 0 -2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,230,180,0.6);
+}
+.st-base-mid {
+    position: absolute;
+    top: 12px; left: 50%;
+    transform: translateX(-50%);
+    width: 100px; height: 30px;
+    background: linear-gradient(180deg, #d4a04a 0%, #8b5a2b 100%);
+    border-radius: 6px;
+    box-shadow: inset 0 2px 4px rgba(255,220,160,0.4), inset 0 -3px 6px rgba(60,30,5,0.6);
+}
+.st-base-button {
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 14px; height: 14px;
+    background: radial-gradient(circle at 35% 30%, #f0c060 0%, #a06820 70%, #5a3010 100%);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,230,180,0.5);
+}
+.st-base-bottom {
+    position: absolute;
+    top: 44px; left: 50%;
+    transform: translateX(-50%);
+    width: 124px; height: 18px;
+    background: linear-gradient(180deg, #c89344 0%, #8b5a2b 60%, #5a3a18 100%);
+    border-radius: 4px 4px 8px 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,220,160,0.5);
+}
+
+/* ---------- Lyrics ---------- */
+.st-lyrics-container {
+    position: fixed;
+    bottom: 14vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(92vw, 900px);
+    z-index: 2147483646; /* always on top of all page content */
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    padding: 18px 28px;
+    border-radius: 18px;
+    background: radial-gradient(ellipse at center, rgba(20,10,4,0.78) 0%, rgba(20,10,4,0.55) 60%, rgba(20,10,4,0) 100%);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+.st-lyrics-container.active { opacity: 1; }
+.st-lyrics-text {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800;
+    font-size: clamp(1.2rem, 3.4vw, 2.4rem);
+    line-height: 1.3;
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 22px rgba(255, 180, 60, 0.7), 0 4px 14px rgba(0,0,0,0.85);
+    animation: st-lyric-in 0.6s ease-out;
+}
+@keyframes st-lyric-in {
+    0%   { opacity: 0; transform: translateY(18px) scale(0.96); }
+    100% { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.st-lyrics-text.st-title {
+    background: linear-gradient(180deg, #fff4c4 0%, #ffd76a 45%, #c89344 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.st-lyrics-text.st-romaji {
+    background: linear-gradient(180deg, #fff8d8 0%, #ffd76a 50%, #b07820 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.st-lyrics-text.st-jp { color: #ffd99a; }
+.st-lyrics-text.st-jp-chorus {
+    background: linear-gradient(180deg, #fff4c4 0%, #ffba47 50%, #d97706 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: clamp(1.4rem, 4vw, 2.7rem);
+}
+
+/* ============================================
+   SACRED TORCH SITE-WIDE THEME
+   Brass / amber / candlelit gold palette
+   Auto-reverts when class is removed.
+   ============================================ */
+body.sacred-torch-playing {
+    background: linear-gradient(135deg, #1a0e06 0%, #2a1608 45%, #3a1d0a 100%) !important;
+    color: #ffe4b5 !important;
+    transition: background 1.5s ease, color 1.5s ease;
+}
+body.sacred-torch-playing *:not(#sacred-torch-scene):not(#sacred-torch-scene *):not(#sacred-torch-video-wrap):not(#sacred-torch-video-wrap *):not(.st-lyrics-container):not(.st-lyrics-container *) {
+    transition: background-color 1s ease, color 1s ease, border-color 1s ease, box-shadow 1s ease;
+}
+body.sacred-torch-playing .glass-card {
+    background: rgba(50, 28, 12, 0.6) !important;
+    border-color: rgba(255, 180, 80, 0.3) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: 0 10px 40px -10px rgba(255, 140, 40, 0.35),
+                inset 0 1px 0 rgba(255, 220, 160, 0.18) !important;
+}
+body.sacred-torch-playing .glass-card:hover {
+    box-shadow: 0 18px 55px -10px rgba(255, 170, 60, 0.55),
+                inset 0 1px 0 rgba(255, 220, 160, 0.3) !important;
+}
+body.sacred-torch-playing .section-nav-bar {
+    background: rgba(40, 22, 8, 0.88) !important;
+    border-bottom-color: rgba(255, 180, 80, 0.3) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: 0 2px 16px rgba(255, 140, 40, 0.3) !important;
+}
+body.sacred-torch-playing .section-nav-link { color: #ffd99a !important; }
+body.sacred-torch-playing .section-nav-link:hover,
+body.sacred-torch-playing .section-nav-link.active {
+    background: linear-gradient(180deg, #ffba47 0%, #b07820 100%) !important;
+    color: #2a1608 !important;
+    box-shadow: 0 3px 12px rgba(255, 170, 60, 0.6) !important;
+}
+body.sacred-torch-playing .aero-title {
+    background: linear-gradient(to bottom, #fff4c4 0%, #ffba47 50%, #b07820 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    text-shadow: 0 0 30px rgba(255, 180, 80, 0.45);
+}
+body.sacred-torch-playing .glossy-btn {
+    background: linear-gradient(180deg, #ffba47 0%, #a06820 100%) !important;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.4),
+                0 4px 14px rgba(255, 140, 40, 0.55) !important;
+    color: #2a1608 !important;
+}
+body.sacred-torch-playing .glossy-btn:hover {
+    background: linear-gradient(180deg, #ffd76a 0%, #8b5a2b 100%) !important;
+}
