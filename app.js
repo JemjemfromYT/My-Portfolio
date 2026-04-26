@@ -1089,14 +1089,80 @@ async function creatorSave() {
         localStorage.setItem(CREATOR_SNAPSHOT_KEY, JSON.stringify(snap));
         // Best-effort durable copy (table is optional; ignore failures silently)
         try { await db.from('creator_checkpoint').insert([{ snapshot: snap }]); } catch (_) {}
+        // Purge storage files no longer referenced by any committed DB row.
+        // This is what actually shrinks bucket usage after admin deletions.
+        let purged = 0;
+        try { purged = await purgeOrphanStorageFiles(snap); }
+        catch (e) { console.warn('[creator] purge failed', e); }
+        // Refresh the admin storage meter so the user sees the drop immediately.
+        try { await loadStorageUsage(); } catch (_) {}
         await refreshCreatorPendingCount();
-        creatorStatusEl.textContent = '✓ Checkpoint saved. The realm is sealed.';
+        creatorStatusEl.textContent = purged
+            ? `✓ Checkpoint saved. ${purged} orphan file${purged === 1 ? '' : 's'} purged from storage.`
+            : '✓ Checkpoint saved. The realm is sealed.';
     } catch (e) {
         alert('Save failed: ' + (e.message || e));
     } finally {
         creatorSaveBtn.disabled = false;
         creatorSaveBtn.textContent = '✓ Save';
     }
+}
+
+/* ---- Storage purge: delete files in portfolio-assets that no committed
+   DB row references anymore. Called only on Save (irreversible). ---- */
+async function purgeOrphanStorageFiles(snap) {
+    // 1) Collect every URL/path still referenced by the committed snapshot.
+    const referenced = new Set();
+    const urlCols = ['image_url', 'cover_image', 'avatar_url', 'url', 'link', 'src', 'file_url', 'media_url', 'audio_url'];
+    for (const tableName of Object.keys(snap.tables || {})) {
+        for (const row of snap.tables[tableName] || []) {
+            for (const col of urlCols) {
+                const val = row?.[col];
+                if (typeof val === 'string' && val.includes('/portfolio-assets/')) {
+                    // Extract the object path (everything after the bucket name).
+                    const path = val.split('/portfolio-assets/')[1].split('?')[0];
+                    if (path) referenced.add(decodeURIComponent(path));
+                }
+            }
+        }
+    }
+    // 2) List every file currently in the bucket.
+    const allFiles = await listAllFilesWithPath('');
+    // 3) Anything in the bucket but not referenced is orphaned → delete.
+    const orphans = allFiles.filter(p => !referenced.has(p));
+    if (!orphans.length) return 0;
+    // Supabase remove() takes up to ~1000 paths per call; chunk to be safe.
+    let removed = 0;
+    for (let i = 0; i < orphans.length; i += 100) {
+        const chunk = orphans.slice(i, i + 100);
+        const { data, error } = await db.storage.from(STORAGE_BUCKET).remove(chunk);
+        if (error) { console.warn('[creator] storage remove', error.message); continue; }
+        removed += (data || chunk).length;
+    }
+    return removed;
+}
+
+// Like listAllFiles but returns full object paths (folder/name), not file objects.
+async function listAllFilesWithPath(path = '', acc = []) {
+    let offset = 0;
+    while (true) {
+        const { data, error } = await db.storage.from(STORAGE_BUCKET).list(path, {
+            limit: 100, offset, sortBy: { column: 'name', order: 'asc' }
+        });
+        if (error || !data) break;
+        for (const item of data) {
+            const isFolder = item.id === null || (!item.metadata && item.name && !item.name.includes('.'));
+            if (isFolder) {
+                const sub = path ? `${path}/${item.name}` : item.name;
+                await listAllFilesWithPath(sub, acc);
+            } else {
+                acc.push(path ? `${path}/${item.name}` : item.name);
+            }
+        }
+        if (data.length < 100) break;
+        offset += 100;
+    }
+    return acc;
 }
 
 /* ---- Undo (restore snapshot) ---- */
