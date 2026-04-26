@@ -1198,9 +1198,11 @@
             <div class="flex flex-col md:flex-row items-center gap-8 relative z-10">
                 <div class="relative group">
                     <div class="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-4 border-white shadow-xl transition-transform duration-500 group-hover:scale-105">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=James" alt="James" class="w-full h-full object-cover bg-sky-100">
+                        <img id="profile-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=James" alt="James" class="w-full h-full object-cover bg-sky-100">
                     </div>
                     <div class="absolute bottom-2 right-2 bg-emerald-500 text-white text-[10px] font-black px-3 py-1 rounded-full border-2 border-white shadow-lg animate-pulse">ONLINE</div>
+                    <button id="edit-avatar-btn" class="hidden absolute -top-1 -right-1 bg-sky-500 hover:bg-sky-600 text-white rounded-full w-9 h-9 flex items-center justify-center text-sm shadow-lg border-2 border-white font-bold transition-colors" title="Edit profile photo">&#9998;</button>
+                    <input type="file" id="input-avatar-file" accept="image/*" class="hidden">
                 </div>
                 <div class="text-center md:text-left">
                     <h1 class="text-4xl md:text-5xl font-extrabold aero-title tracking-tight mb-1">James Saavedra</h1>
@@ -1404,6 +1406,150 @@
 
 <!-- Stealth Button -->
 <button id="stealth-btn" class="fixed bottom-6 right-6 opacity-20 hover:opacity-100 text-3xl z-[150] transition-opacity drop-shadow-lg grayscale hover:grayscale-0">&#128189;</button>
+
+<!-- ===================== CREATOR MODE ===================== -->
+<style>
+  /* S-rank crimson sigil for the floating Creator button */
+  @keyframes creatorPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,.55), 0 0 30px rgba(220,38,38,.55), 0 0 60px rgba(127,29,29,.45); }
+    50%     { box-shadow: 0 0 0 14px rgba(220,38,38,0),   0 0 45px rgba(248,113,113,.85), 0 0 90px rgba(127,29,29,.6); }
+  }
+  @keyframes creatorRune {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  @keyframes creatorEmber {
+    0%,100% { opacity: .85; filter: drop-shadow(0 0 6px #ef4444); }
+    50%     { opacity: 1;   filter: drop-shadow(0 0 18px #f87171); }
+  }
+  @keyframes creatorSummon {
+    0%   { transform: translateY(40px) scale(.5); opacity: 0; filter: blur(10px); }
+    60%  { transform: translateY(-6px) scale(1.05); opacity: 1; filter: blur(0); }
+    100% { transform: translateY(0)    scale(1);   opacity: 1; }
+  }
+  @keyframes creatorBoxIn {
+    0%   { transform: scale(.8) rotateX(20deg); opacity: 0; filter: blur(8px); }
+    100% { transform: scale(1)  rotateX(0);     opacity: 1; filter: blur(0); }
+  }
+  @keyframes creatorScan {
+    0%   { transform: translateY(-100%); }
+    100% { transform: translateY(800%);  }
+  }
+  @keyframes creatorGlitch {
+    0%,90%,100% { transform: translate(0,0); }
+    92%         { transform: translate(-2px,1px); }
+    94%         { transform: translate(2px,-1px); }
+    96%         { transform: translate(-1px,-2px); }
+  }
+
+  #creator-btn {
+    animation: creatorSummon .9s cubic-bezier(.2,.8,.2,1.2) both, creatorPulse 2.2s ease-in-out infinite 1s;
+  }
+  #creator-btn .rune-ring {
+    animation: creatorRune 9s linear infinite;
+  }
+  #creator-btn .crest {
+    animation: creatorEmber 1.6s ease-in-out infinite;
+  }
+  #creator-btn .notif-dot {
+    animation: creatorPulse 1.4s ease-in-out infinite;
+  }
+  #creator-box {
+    animation: creatorBoxIn .55s cubic-bezier(.2,.8,.2,1.1) both;
+  }
+  #creator-box .scanline {
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(248,113,113,.9), transparent);
+    animation: creatorScan 3s linear infinite;
+    pointer-events: none;
+  }
+  #creator-title { animation: creatorGlitch 4s infinite; }
+
+  /* While creator panel is open, deepen the page */
+  body.creator-open::after {
+    content:""; position: fixed; inset: 0; z-index: 399;
+    background: radial-gradient(ellipse at center, rgba(127,29,29,.25), rgba(0,0,0,.85) 70%);
+    pointer-events: none;
+  }
+</style>
+
+<!-- Floating Creator button (only shown when admin is active) -->
+<button id="creator-btn"
+    class="hidden fixed bottom-6 right-24 z-[155] w-16 h-16 rounded-full
+           bg-gradient-to-br from-red-700 via-red-600 to-rose-900
+           border border-red-400/70 text-white flex items-center justify-center
+           overflow-visible group"
+    title="Creator">
+    <!-- rotating rune ring -->
+    <svg class="rune-ring absolute inset-[-6px] w-[76px] h-[76px] opacity-90" viewBox="0 0 100 100" fill="none">
+        <circle cx="50" cy="50" r="46" stroke="rgba(248,113,113,.7)" stroke-width="1" stroke-dasharray="3 6"/>
+        <circle cx="50" cy="50" r="40" stroke="rgba(220,38,38,.55)" stroke-width="1" stroke-dasharray="1 4"/>
+        <polygon points="50,8 53,18 50,16 47,18" fill="#fecaca"/>
+        <polygon points="50,92 53,82 50,84 47,82" fill="#fecaca"/>
+        <polygon points="8,50 18,53 16,50 18,47" fill="#fecaca"/>
+        <polygon points="92,50 82,53 84,50 82,47" fill="#fecaca"/>
+    </svg>
+    <!-- crest -->
+    <span class="crest text-3xl font-black leading-none select-none">S</span>
+    <!-- notification dot -->
+    <span class="notif-dot absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-400 border border-red-200"></span>
+</button>
+
+<!-- Creator overlay -->
+<div id="creator-overlay" class="fixed inset-0 z-[400] hidden flex items-center justify-center p-6">
+    <div id="creator-box" class="relative w-[92%] max-w-md p-[2px] rounded-2xl overflow-hidden
+                                  bg-gradient-to-br from-red-500 via-rose-700 to-red-950
+                                  shadow-[0_0_60px_rgba(220,38,38,.6),0_0_140px_rgba(127,29,29,.45)]">
+        <div class="rounded-2xl bg-black/95 px-7 py-8 relative overflow-hidden">
+            <div class="scanline"></div>
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] tracking-[0.4em] text-red-400/80 font-black">// CLEARANCE&nbsp;LEVEL&nbsp;S</span>
+                <button id="creator-close" class="text-red-300/70 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <h2 id="creator-title" class="text-3xl text-red-400 font-black tracking-[0.18em] italic mb-1">CREATOR&nbsp;GATE</h2>
+            <p id="creator-sub" class="text-red-200/70 text-xs uppercase tracking-[0.3em] mb-6">Authority verification required</p>
+
+            <!-- Auth pane -->
+            <div id="creator-auth-pane">
+                <p class="text-red-100/80 text-sm mb-4">Enter the Creator code to oversee admin changes.</p>
+                <input type="password" id="creator-code-input" maxlength="8" placeholder="ENTER CODE"
+                       class="w-full bg-black/70 border-2 border-red-700 text-center text-3xl tracking-[0.5em] text-red-300 font-black outline-none py-3 rounded-lg placeholder:text-red-900/70 focus:border-red-400 focus:shadow-[0_0_25px_rgba(248,113,113,.6)] transition-all">
+                <button id="creator-submit"
+                        class="mt-4 w-full py-3 border border-red-500/60 bg-red-900/30 text-red-300 font-black hover:bg-red-600 hover:text-white transition-all duration-300 tracking-[0.3em] uppercase rounded-lg">
+                    Authenticate
+                </button>
+                <p id="creator-error" class="hidden mt-3 text-center text-red-400 text-xs font-bold tracking-widest uppercase">Access Denied</p>
+            </div>
+
+            <!-- Control pane (after auth) -->
+            <div id="creator-control-pane" class="hidden">
+                <div class="border border-red-700/60 rounded-lg p-4 mb-5 bg-red-950/30">
+                    <div class="flex items-center justify-between text-xs text-red-300/80 mb-2 font-bold tracking-widest uppercase">
+                        <span>Pending Edits</span>
+                        <span id="creator-pending-count" class="text-red-300">checking…</span>
+                    </div>
+                    <p id="creator-status" class="text-red-100/90 text-sm leading-snug">
+                        Reviewing the realm's recent changes…
+                    </p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="creator-undo"
+                            class="py-3 border border-red-500/60 bg-black text-red-300 font-black hover:bg-red-600 hover:text-white transition-all duration-300 tracking-[0.2em] uppercase rounded-lg shadow-[0_0_20px_rgba(220,38,38,.25)]">
+                        ⟲ Undo
+                    </button>
+                    <button id="creator-save"
+                            class="py-3 border border-red-300/70 bg-gradient-to-br from-red-600 to-red-800 text-white font-black hover:from-red-500 hover:to-red-700 transition-all duration-300 tracking-[0.2em] uppercase rounded-lg shadow-[0_0_25px_rgba(248,113,113,.5)]">
+                        ✓ Save
+                    </button>
+                </div>
+                <p class="mt-4 text-[10px] text-red-300/60 tracking-widest uppercase text-center">
+                    Save promotes current state as new checkpoint · Undo restores the last checkpoint
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- =================== /CREATOR MODE ===================== -->
 
 <!-- Ad=min Modal -->
 <div id="admin-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden flex-col items-center justify-center z-[300] p-6">

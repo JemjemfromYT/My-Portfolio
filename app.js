@@ -255,12 +255,35 @@ function renderProfileInfo(data) {
     if (profileBio) profileBio.textContent = data.bio || '';
     if (profileStatus) profileStatus.textContent = `Status: ${data.status || 'Training Arc'}`;
     if (profileLocation) profileLocation.textContent = data.location || 'Gingoog City, PH';
-    
+
+    const avatarImg = document.getElementById('profile-avatar');
+    if (avatarImg && data.avatar_url) avatarImg.src = data.avatar_url;
+
     if (profileTechStack && data.tech_stack) {
-        profileTechStack.innerHTML = data.tech_stack.map(tech => 
+        profileTechStack.innerHTML = data.tech_stack.map(tech =>
             `<span class="px-3 py-1 bg-sky-100 rounded-lg text-xs tracking-widest uppercase shadow-sm border border-white font-bold text-sky-800">${tech}</span>`
         ).join('');
     }
+}
+
+// Avatar (profile photo) edit
+const editAvatarBtn = document.getElementById('edit-avatar-btn');
+const inputAvatarFile = document.getElementById('input-avatar-file');
+if (editAvatarBtn && inputAvatarFile) {
+    editAvatarBtn.addEventListener('click', () => inputAvatarFile.click());
+    inputAvatarFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const safeName = file.name.replace(/\s+/g, '-');
+        const fileName = `avatars/${Date.now()}-${safeName}`;
+        const { error: upErr } = await db.storage.from('portfolio-assets').upload(fileName, file, { contentType: file.type });
+        if (upErr) return alert('Upload error: ' + upErr.message);
+        const { data: urlData } = db.storage.from('portfolio-assets').getPublicUrl(fileName);
+        const { error } = await db.from('profile_info').update({ avatar_url: urlData.publicUrl, updated_at: new Date().toISOString() }).eq('id', 1);
+        if (error) return alert('Error: ' + error.message);
+        inputAvatarFile.value = '';
+        loadPortfolio();
+    });
 }
 
 async function loadSiteSettings() {
@@ -412,7 +435,10 @@ function renderMusic(music) {
                 </div>
                 <h3 class="font-extrabold text-slate-800 text-lg truncate">${track.title}</h3>
                 <p class="text-sm text-violet-600/70 font-medium truncate">${track.artist || 'Unknown Artist'}</p>
-                ${isAdmin ? `<button onclick="event.stopPropagation(); deleteItem('music', '${track.id}')" class="absolute top-2 left-2 bg-red-500/90 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs shadow-md border border-red-400 font-bold z-10 hover:bg-red-600 backdrop-blur-sm">&#x2715;</button>` : ''}
+                ${isAdmin ? `
+                    <button onclick="event.stopPropagation(); editMusic('${track.id}')" class="absolute top-2 right-2 bg-violet-500/90 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs shadow-md border border-violet-400 font-bold z-10 hover:bg-violet-600 backdrop-blur-sm" title="Edit">&#9998;</button>
+                    <button onclick="event.stopPropagation(); deleteItem('music', '${track.id}')" class="absolute top-2 left-2 bg-red-500/90 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs shadow-md border border-red-400 font-bold z-10 hover:bg-red-600 backdrop-blur-sm" title="Delete">&#x2715;</button>
+                ` : ''}
             </div>
         `;
     }).join('');
@@ -493,8 +519,9 @@ function renderProjects(projects) {
                     <div class="absolute inset-0 bg-gradient-to-t from-sky-900/40 to-transparent pointer-events-none"></div>
                     ${isAdmin ? `
                         <div class="absolute top-3 right-3 flex gap-2 z-20">
+                            <button onclick="editProject('${p.id}')" class="bg-emerald-500/90 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm shadow-lg border border-emerald-400 font-bold hover:bg-emerald-600 transition-colors backdrop-blur-sm" title="Edit Project">&#9998;</button>
                             <button onclick="editProjectOrder('${p.id}', ${p.display_order || 0})" class="bg-sky-500/90 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm shadow-lg border border-sky-400 font-bold hover:bg-sky-600 transition-colors backdrop-blur-sm" title="Edit Order">&#9650;</button>
-                            <button onclick="deleteItem('projects', '${p.id}')" class="bg-red-500/90 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm shadow-lg border border-red-400 font-bold hover:bg-red-600 transition-colors backdrop-blur-sm">&#x2715;</button>
+                            <button onclick="deleteItem('projects', '${p.id}')" class="bg-red-500/90 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm shadow-lg border border-red-400 font-bold hover:bg-red-600 transition-colors backdrop-blur-sm" title="Delete">&#x2715;</button>
                         </div>
                     ` : ''}
                 </div>
@@ -514,6 +541,91 @@ window.editProjectOrder = async function(projectId, currentOrder) {
         if (error) alert("Error: " + error.message);
         else loadPortfolio();
     }
+}
+
+window.editProject = async function(projectId) {
+    const p = (allProjects || []).find(x => x.id === projectId);
+    if (!p) return alert('Project not found.');
+    const title = prompt('Project title:', p.title || '');
+    if (title === null) return;
+    const languages = prompt('Languages (comma separated):', p.languages || '');
+    if (languages === null) return;
+    const description = await promptTextarea('Edit project description:', p.description || '');
+    if (description === null) return;
+    const link = prompt('Project URL (leave blank for none):', p.link || '');
+    if (link === null) return;
+    const replaceImg = confirm('Replace project image? OK = yes, Cancel = keep current image.');
+    let image_url = p.image_url;
+    if (replaceImg) {
+        const file = await pickFile('image/*');
+        if (file) {
+            const fileName = `projects/${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+            const { error: upErr } = await db.storage.from('portfolio-assets').upload(fileName, file, { contentType: file.type });
+            if (upErr) return alert('Upload error: ' + upErr.message);
+            image_url = db.storage.from('portfolio-assets').getPublicUrl(fileName).data.publicUrl;
+        }
+    }
+    const { error } = await db.from('projects').update({ title, languages, description, link, image_url }).eq('id', projectId);
+    if (error) alert('Error: ' + error.message);
+    else loadPortfolio();
+}
+
+window.editMusic = async function(musicId) {
+    const t = (allMusic || []).find(x => x.id === musicId);
+    if (!t) return alert('Track not found.');
+    const title = prompt('Track title:', t.title || '');
+    if (title === null) return;
+    const artist = prompt('Artist:', t.artist || '');
+    if (artist === null) return;
+    const replaceImg = confirm('Replace cover image? OK = yes, Cancel = keep current.');
+    let image_url = t.image_url;
+    if (replaceImg) {
+        const file = await pickFile('image/*');
+        if (file) {
+            const fileName = `music/${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+            const { error: upErr } = await db.storage.from('portfolio-assets').upload(fileName, file, { contentType: file.type });
+            if (upErr) return alert('Upload error: ' + upErr.message);
+            image_url = db.storage.from('portfolio-assets').getPublicUrl(fileName).data.publicUrl;
+        }
+    }
+    const { error } = await db.from('music').update({ title, artist, image_url }).eq('id', musicId);
+    if (error) alert('Error: ' + error.message);
+    else loadPortfolio();
+}
+
+function pickFile(accept) {
+    return new Promise((resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = accept || '*/*';
+        input.onchange = () => resolve(input.files[0] || null);
+        input.oncancel = () => resolve(null);
+        input.click();
+    });
+}
+
+function promptTextarea(label, initialValue) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.55);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        overlay.innerHTML = `
+            <div style="background:white;border-radius:18px;padding:24px;max-width:560px;width:100%;box-shadow:0 25px 60px -15px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.6);">
+                <h3 style="font-size:1.1rem;font-weight:800;color:#0c4a6e;margin-bottom:14px;letter-spacing:-0.01em;">${label}</h3>
+                <textarea id="__pt_input" style="width:100%;min-height:160px;padding:12px 14px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-family:inherit;line-height:1.55;resize:vertical;outline:none;color:#0f172a;background:#f8fafc;"></textarea>
+                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+                    <button id="__pt_cancel" style="padding:9px 18px;border-radius:9px;border:1px solid #cbd5e1;background:white;color:#475569;font-weight:600;font-size:13px;cursor:pointer;">Cancel</button>
+                    <button id="__pt_save" style="padding:9px 20px;border-radius:9px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:white;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 12px rgba(16,185,129,0.35);">Save</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        const ta = overlay.querySelector('#__pt_input');
+        ta.value = initialValue || '';
+        ta.focus();
+        const close = (val) => { document.body.removeChild(overlay); resolve(val); };
+        overlay.querySelector('#__pt_cancel').onclick = () => close(null);
+        overlay.querySelector('#__pt_save').onclick = () => close(ta.value);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+    });
 }
 
 window.toggleFilter = function(lang) {
@@ -794,10 +906,12 @@ notifSubmit.addEventListener('click', () => {
         isAdmin = true;
         adminIndicator.classList.remove('hidden');
         document.getElementById('storage-tracker')?.classList.remove('hidden');
-        [addProjectBtn, addCertBtn, addHobbyBtn, addSocialBtn, editProfileBtn, editQuoteBtn, editWisdomBtn, addMusicBtn].forEach(btn => btn?.classList.remove('hidden'));
+        [addProjectBtn, addCertBtn, addHobbyBtn, addSocialBtn, editProfileBtn, editQuoteBtn, editWisdomBtn, addMusicBtn, document.getElementById('edit-avatar-btn')].forEach(btn => btn?.classList.remove('hidden'));
         loadPortfolio();
         loadStorageUsage();
         closeSystemNotif();
+        // Creator system: snapshot current state + announce review notice + reveal Creator button
+        onAdminLogin();
     } else {
         notifPinInput.value = "";
         notifPinInput.placeholder = "ACCESS DENIED";
@@ -805,6 +919,237 @@ notifSubmit.addEventListener('click', () => {
         setTimeout(() => notifPinInput.classList.remove('animate-pulse', 'border-red-500', 'text-red-500'), 500);
     }
 });
+
+/* =====================================================================
+   CREATOR MODE
+   - Snapshots editable tables on admin login (rollback point)
+   - Floating S-rank crimson button (visible only when admin is active)
+   - Code verified via Supabase RPC `verify_creator_code(code)` -> bool
+   - Save  : promotes the live DB state to the new checkpoint
+   - Undo  : restores the snapshot row-by-row (upsert + delete extras)
+   ===================================================================== */
+
+const CREATOR_TABLES = [
+    { name: 'projects',      pk: 'id' },
+    { name: 'certificates',  pk: 'id' },
+    { name: 'hobbies',       pk: 'id' },
+    { name: 'socials',       pk: 'id' },
+    { name: 'music',         pk: 'id' },
+    { name: 'hobby_gallery', pk: 'id' },
+    { name: 'wisdom_slides', pk: 'id' },
+    { name: 'profile_info',  pk: 'id' },
+    { name: 'site_settings', pk: 'id' },
+];
+const CREATOR_SNAPSHOT_KEY = 'creator_checkpoint_v1';
+
+const creatorBtn         = document.getElementById('creator-btn');
+const creatorOverlay     = document.getElementById('creator-overlay');
+const creatorClose       = document.getElementById('creator-close');
+const creatorAuthPane    = document.getElementById('creator-auth-pane');
+const creatorControlPane = document.getElementById('creator-control-pane');
+const creatorCodeInput   = document.getElementById('creator-code-input');
+const creatorSubmitBtn   = document.getElementById('creator-submit');
+const creatorErrorEl     = document.getElementById('creator-error');
+const creatorPendingEl   = document.getElementById('creator-pending-count');
+const creatorStatusEl    = document.getElementById('creator-status');
+const creatorUndoBtn     = document.getElementById('creator-undo');
+const creatorSaveBtn     = document.getElementById('creator-save');
+
+let creatorAuthorized = false;
+
+async function snapshotAllTables() {
+    const snap = { takenAt: new Date().toISOString(), tables: {} };
+    for (const t of CREATOR_TABLES) {
+        const { data, error } = await db.from(t.name).select('*');
+        if (error) { console.warn('[creator] snapshot', t.name, error.message); continue; }
+        snap.tables[t.name] = data || [];
+    }
+    return snap;
+}
+
+async function onAdminLogin() {
+    // 1) Notice to the admin
+    setTimeout(() => {
+        alert("⚠ Anything you edit will change the live portfolio.\nHowever, all changes remain subject to Creator review.");
+    }, 250);
+
+    // 2) Take a fresh local snapshot if none exists yet for this session
+    try {
+        if (!localStorage.getItem(CREATOR_SNAPSHOT_KEY)) {
+            const snap = await snapshotAllTables();
+            localStorage.setItem(CREATOR_SNAPSHOT_KEY, JSON.stringify(snap));
+        }
+    } catch (e) { console.warn('[creator] snapshot failed', e); }
+
+    // 3) Reveal the floating Creator button (delayed so it feels like a notification)
+    setTimeout(() => creatorBtn?.classList.remove('hidden'), 1800);
+}
+
+function openCreatorOverlay() {
+    creatorOverlay.classList.remove('hidden');
+    document.body.classList.add('creator-open');
+    if (creatorAuthorized) {
+        showCreatorControlPane();
+    } else {
+        creatorAuthPane.classList.remove('hidden');
+        creatorControlPane.classList.add('hidden');
+        creatorErrorEl.classList.add('hidden');
+        creatorCodeInput.value = '';
+        setTimeout(() => creatorCodeInput.focus(), 80);
+    }
+}
+function closeCreatorOverlay() {
+    creatorOverlay.classList.add('hidden');
+    document.body.classList.remove('creator-open');
+}
+
+async function showCreatorControlPane() {
+    creatorAuthPane.classList.add('hidden');
+    creatorControlPane.classList.remove('hidden');
+    await refreshCreatorPendingCount();
+}
+
+async function refreshCreatorPendingCount() {
+    creatorPendingEl.textContent = 'scanning…';
+    creatorStatusEl.textContent  = 'Comparing live state with the last checkpoint…';
+    try {
+        const raw = localStorage.getItem(CREATOR_SNAPSHOT_KEY);
+        if (!raw) {
+            creatorPendingEl.textContent = '0';
+            creatorStatusEl.textContent  = 'No checkpoint stored. Save now to create one.';
+            return;
+        }
+        const snap = JSON.parse(raw);
+        let diff = 0;
+        for (const t of CREATOR_TABLES) {
+            const before = snap.tables?.[t.name] || [];
+            const { data: now } = await db.from(t.name).select('*');
+            diff += diffRowCount(before, now || [], t.pk);
+        }
+        creatorPendingEl.textContent = String(diff);
+        creatorStatusEl.textContent  = diff === 0
+            ? 'Realm is in sync with the last checkpoint.'
+            : `${diff} change(s) detected since the last checkpoint.`;
+    } catch (e) {
+        creatorPendingEl.textContent = '?';
+        creatorStatusEl.textContent  = 'Could not compute diff.';
+    }
+}
+
+function diffRowCount(beforeArr, nowArr, pk) {
+    const bMap = new Map(beforeArr.map(r => [r[pk], r]));
+    const nMap = new Map(nowArr.map(r => [r[pk], r]));
+    let count = 0;
+    for (const [id, row] of nMap) {
+        if (!bMap.has(id)) { count++; continue; }
+        if (JSON.stringify(bMap.get(id)) !== JSON.stringify(row)) count++;
+    }
+    for (const id of bMap.keys()) if (!nMap.has(id)) count++;
+    return count;
+}
+
+/* ---- Auth ---- */
+async function submitCreatorCode() {
+    const code = (creatorCodeInput.value || '').trim();
+    creatorErrorEl.classList.add('hidden');
+    creatorSubmitBtn.disabled = true;
+    creatorSubmitBtn.textContent = 'VERIFYING…';
+    try {
+        const { data, error } = await db.rpc('verify_creator_code', { code });
+        if (error) throw error;
+        if (data === true) {
+            creatorAuthorized = true;
+            await showCreatorControlPane();
+        } else {
+            denyCreator();
+        }
+    } catch (e) {
+        console.error('[creator] verify failed', e);
+        denyCreator('VERIFY FAILED');
+    } finally {
+        creatorSubmitBtn.disabled = false;
+        creatorSubmitBtn.textContent = 'Authenticate';
+    }
+}
+function denyCreator(msg = 'ACCESS DENIED') {
+    creatorErrorEl.textContent = msg;
+    creatorErrorEl.classList.remove('hidden');
+    creatorCodeInput.value = '';
+    creatorCodeInput.classList.add('animate-pulse');
+    setTimeout(() => creatorCodeInput.classList.remove('animate-pulse'), 500);
+}
+
+/* ---- Save (new checkpoint) ---- */
+async function creatorSave() {
+    if (!confirm('Promote the current portfolio state as the new checkpoint?\n(All admin edits since the last checkpoint become permanent for undo purposes.)')) return;
+    creatorSaveBtn.disabled = true;
+    creatorSaveBtn.textContent = 'SAVING…';
+    try {
+        const snap = await snapshotAllTables();
+        localStorage.setItem(CREATOR_SNAPSHOT_KEY, JSON.stringify(snap));
+        // Best-effort durable copy (table is optional; ignore failures silently)
+        try { await db.from('creator_checkpoint').insert([{ snapshot: snap }]); } catch (_) {}
+        await refreshCreatorPendingCount();
+        creatorStatusEl.textContent = '✓ Checkpoint saved. The realm is sealed.';
+    } catch (e) {
+        alert('Save failed: ' + (e.message || e));
+    } finally {
+        creatorSaveBtn.disabled = false;
+        creatorSaveBtn.textContent = '✓ Save';
+    }
+}
+
+/* ---- Undo (restore snapshot) ---- */
+async function creatorUndo() {
+    const raw = localStorage.getItem(CREATOR_SNAPSHOT_KEY);
+    if (!raw) { alert('No checkpoint to restore from.'); return; }
+    if (!confirm('Roll the portfolio back to the last checkpoint?\nThis will reverse every admin edit made since then.')) return;
+
+    creatorUndoBtn.disabled = true;
+    creatorUndoBtn.textContent = 'UNDOING…';
+    try {
+        const snap = JSON.parse(raw);
+        for (const t of CREATOR_TABLES) {
+            const before = snap.tables?.[t.name] || [];
+            const { data: now } = await db.from(t.name).select(t.pk);
+            const beforeIds = new Set(before.map(r => r[t.pk]));
+            const nowIds    = new Set((now || []).map(r => r[t.pk]));
+            // 1) delete rows that didn't exist at checkpoint
+            const toDelete = [...nowIds].filter(id => !beforeIds.has(id));
+            if (toDelete.length) {
+                const { error } = await db.from(t.name).delete().in(t.pk, toDelete);
+                if (error) console.warn('[creator] delete', t.name, error.message);
+            }
+            // 2) upsert checkpoint rows (recreates deleted, reverts modified)
+            if (before.length) {
+                const { error } = await db.from(t.name).upsert(before, { onConflict: t.pk });
+                if (error) console.warn('[creator] upsert', t.name, error.message);
+            }
+        }
+        creatorStatusEl.textContent = '⟲ Realm restored to the last checkpoint.';
+        await refreshCreatorPendingCount();
+        // Refresh whatever the page is currently showing
+        try { await loadPortfolio(); } catch (_) {}
+        try { await loadProfileInfo?.(); } catch (_) {}
+        try { await loadWisdomSlides?.(); } catch (_) {}
+        try { await loadMusic?.(); } catch (_) {}
+    } catch (e) {
+        alert('Undo failed: ' + (e.message || e));
+    } finally {
+        creatorUndoBtn.disabled = false;
+        creatorUndoBtn.textContent = '⟲ Undo';
+    }
+}
+
+/* ---- Wire up ---- */
+creatorBtn?.addEventListener('click', openCreatorOverlay);
+creatorClose?.addEventListener('click', closeCreatorOverlay);
+creatorOverlay?.addEventListener('click', (e) => { if (e.target === creatorOverlay) closeCreatorOverlay(); });
+creatorSubmitBtn?.addEventListener('click', submitCreatorCode);
+creatorCodeInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCreatorCode(); });
+creatorSaveBtn?.addEventListener('click', creatorSave);
+creatorUndoBtn?.addEventListener('click', creatorUndo);
+/* ================== /CREATOR MODE ================== */
 
 /* ===== ADMIN: Cloud storage usage tracker (free tier 1GB) ===== */
 const STORAGE_BUCKET = 'portfolio-assets';
