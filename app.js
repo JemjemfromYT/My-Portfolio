@@ -462,10 +462,12 @@ async function loadPortfolio() {
     renderCertificates(allCerts);
 
     const { data: hobbies } = await db.from('hobbies').select('*').order('rank', { ascending: true });
+    window.allHobbies = hobbies || [];
     renderHobbies(hobbies || []);
 
     const { data: socials } = await db.from('socials').select('*');
     socialsCache = socials || [];
+    window.socialsCache = socialsCache;
     renderSocials(socialsCache);
 }
 
@@ -488,12 +490,26 @@ function renderProjects(projects) {
         if (p.languages) p.languages.split(',').forEach(l => allLangs.add(l.trim()));
     });
 
-    projectFiltersBox.innerHTML = Array.from(allLangs).sort().map(lang => `
-        <label class="flex items-center gap-2 bg-white/60 hover:bg-white px-5 py-2 rounded-full border border-white/50 shadow-sm cursor-pointer transition-all duration-300 hover:shadow-md ${activeFilters.has(lang) ? 'bg-sky-100 border-sky-300' : ''}">
-            <input type="checkbox" value="${lang}" class="hidden" ${activeFilters.has(lang) ? 'checked' : ''} onchange="toggleFilter('${lang}')">
-            <span class="text-xs font-bold text-sky-900 uppercase tracking-widest">${lang}</span>
-        </label>
-    `).join('');
+    projectFiltersBox.innerHTML = Array.from(allLangs).sort().map(lang => {
+        const isActive = activeFilters.has(lang);
+        const baseCls = "flex items-center gap-2 px-5 py-2 rounded-full border shadow-sm cursor-pointer transition-all duration-300 hover:shadow-md";
+        const activeCls = isActive
+            ? "bg-gradient-to-r from-sky-400 to-emerald-400 border-sky-500 ring-2 ring-sky-300/60 shadow-sky-300/50 scale-105"
+            : "bg-white/60 hover:bg-white border-white/50";
+        const textCls = isActive
+            ? "text-xs font-black text-white uppercase tracking-widest drop-shadow"
+            : "text-xs font-bold text-sky-900 uppercase tracking-widest";
+        const checkMark = isActive
+            ? `<span class="text-white font-black text-[11px] leading-none">&#10003;</span>`
+            : '';
+        return `
+            <label class="${baseCls} ${activeCls}">
+                <input type="checkbox" value="${lang}" class="hidden" ${isActive ? 'checked' : ''} onchange="toggleFilter('${lang}')">
+                ${checkMark}
+                <span class="${textCls}">${lang}</span>
+            </label>
+        `;
+    }).join('');
 
     const filteredProjects = activeFilters.size === 0
         ? projects
@@ -569,7 +585,17 @@ window.editProject = async function(projectId) {
     }
     const { error } = await db.from('projects').update({ title, languages, description, link, image_url }).eq('id', projectId);
     if (error) alert('Error: ' + error.message);
-    else loadPortfolio();
+    else {
+        window.logAdminActivity?.({
+            action: 'update',
+            entity_type: 'project',
+            entity_label: title,
+            image_url,
+            details: 'Edited project details'
+        });
+        await loadPortfolio();
+        return true;
+    }
 }
 
 window.editMusic = async function(musicId) {
@@ -1388,14 +1414,28 @@ adminForm.addEventListener('submit', async (e) => {
     }
 
     if (dbError) alert("Database Error: " + dbError.message);
-    else { closeModal(); loadPortfolio(); }
+    else {
+        window.logAdminActivity?.({
+            action: 'create',
+            entity_type: type,
+            entity_label: title,
+            image_url: publicUrl,
+            details: `Added new ${type}`
+        });
+        closeModal();
+        loadPortfolio();
+    }
 });
 
 window.deleteItem = async function(table, id) {
-    if (confirm('Remove this item?')) {
-        await db.from(table).delete().eq('id', id);
-        loadPortfolio();
+    if (!confirm('Remove this item?')) return false;
+    const { error } = await db.from(table).delete().eq('id', id);
+    if (error) {
+        alert('Error: ' + error.message);
+        return false;
     }
+    await loadPortfolio();
+    return true;
 }
 
 window.openGallery = async function(hobbyId, title, coverImgUrl) {
@@ -2615,6 +2655,58 @@ window.saveSocialEdit = async function() {
   const bellSub = document.getElementById('notif-bell-sub');
 
   let activityCache = [];
+  let latestCheckpointTime = null;
+  function isClearMarker(a) {
+    return a?.action === 'checkpoint' || a?.details === '__CLEAR_NOTIFICATIONS__';
+  }
+
+  async function getLatestCreatorCheckpointTime() {
+    try {
+      const { data, error } = await db.from('creator_checkpoint')
+        .select('created_at,snapshot')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (error) return null;
+      const row = (data || [])[0];
+      return row?.created_at || row?.snapshot?.takenAt || null;
+    } catch (_) { return null; }
+  }
+
+  function styleBellFullscreen() {
+    if (!bellPanel) return;
+    // Strip every sizing/positioning class and force true 100vw x 100vh on all screens (mobile + desktop).
+    bellPanel.classList.remove('absolute', 'right-0', 'top-full', 'mt-2', 'w-80', 'max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'rounded-2xl', 'rounded-xl', 'rounded-lg');
+    bellPanel.classList.add('fixed', 'inset-0', 'z-[260]', 'bg-slate-950/95', 'backdrop-blur-md', 'p-0', 'm-0');
+    bellPanel.style.cssText = 'position:fixed;inset:0;top:0;left:0;right:0;bottom:0;width:100vw;height:100vh;max-width:none;max-height:none;margin:0;padding:0;border-radius:0;z-index:260;';
+    if (!document.getElementById('notif-bell-close')) {
+      const closeBtn = document.createElement('button');
+      closeBtn.id = 'notif-bell-close';
+      closeBtn.type = 'button';
+      closeBtn.className = 'fixed top-4 right-4 z-[270] w-12 h-12 rounded-full bg-white text-slate-900 shadow-xl flex items-center justify-center font-black text-xl hover:bg-slate-100';
+      closeBtn.setAttribute('aria-label', 'Close notifications');
+      closeBtn.textContent = '✕';
+      bellPanel.appendChild(closeBtn);
+    }
+    // Force every ancestor wrapper inside the panel to also fill 100% so nothing constrains width on desktop.
+    const shells = bellPanel.querySelectorAll('div');
+    shells.forEach(el => {
+      if (el.contains(bellList) || el === bellList?.parentElement) {
+        el.classList.remove('max-w-sm','max-w-md','max-w-lg','max-w-xl','w-80','w-96','rounded-2xl','rounded-xl');
+        el.style.width = '100%';
+        el.style.maxWidth = 'none';
+        el.style.height = '100%';
+        el.style.maxHeight = 'none';
+        el.style.borderRadius = '0';
+        el.style.display = el.style.display || 'flex';
+        el.style.flexDirection = 'column';
+      }
+    });
+    if (bellList) {
+      bellList.style.flex = '1 1 auto';
+      bellList.style.overflowY = 'auto';
+      bellList.style.maxHeight = 'none';
+    }
+  }
 
   function renderBell() {
     // Badge shows the count of all current activity entries.
@@ -2704,10 +2796,16 @@ window.saveSocialEdit = async function() {
 
   async function loadNotifications() {
     try {
+      latestCheckpointTime = await getLatestCreatorCheckpointTime();
       const { data, error } = await db.from('admin_activity')
-        .select('*').order('created_at', { ascending: false }).limit(30);
+        .select('*').order('created_at', { ascending: false }).limit(100);
       if (error) throw error;
-      activityCache = data || [];
+      const clearMarker = (data || []).find(isClearMarker);
+      const cutoff = clearMarker?.created_at || latestCheckpointTime;
+      activityCache = (data || [])
+        .filter(a => !isClearMarker(a))
+        .filter(a => cutoff ? new Date(a.created_at).getTime() > new Date(cutoff).getTime() : true)
+        .slice(0, 30);
       renderBell();
     } catch (e) {
       activityCache = [];
@@ -2717,32 +2815,64 @@ window.saveSocialEdit = async function() {
   window.loadAdminNotifications = loadNotifications;
 
   // Wipe every activity entry. Called from creator Save / Undo so the bell
-  // resets to zero only when the creator officially commits or rolls back.
+  // count, panel content, cache and DB are all cleared globally — this is
+  // the "official latest checkpoint" moment that cannot be undone again.
   async function clearAllAdminActivity() {
+    latestCheckpointTime = new Date().toISOString();
     try {
-      // delete every row (filter is required by supabase-js for delete)
       await db.from('admin_activity').delete().not('id', 'is', null);
     } catch (e) { console.warn('[notif] clear failed', e); }
+    try {
+      await db.from('admin_activity').insert([{
+        action: 'checkpoint',
+        entity_type: 'system',
+        entity_label: 'Creator checkpoint',
+        details: '__CLEAR_NOTIFICATIONS__',
+        actor: 'creator'
+      }]);
+    } catch (_) {}
     activityCache = [];
     try { renderBell(); } catch (_) {}
+    // If the panel is currently open, immediately reflect the empty state
+    try {
+      if (bellList) bellList.innerHTML = `<p class="text-xs text-slate-400 italic px-4 py-6 text-center">No activity yet.</p>`;
+      if (bellSub) bellSub.textContent = 'No recent activity';
+      if (bellCount) { bellCount.textContent = '0'; bellCount.classList.add('hidden'); }
+    } catch (_) {}
   }
   window.clearAllAdminActivity = clearAllAdminActivity;
+
+  // Always restore page scroll when the panel is hidden — no matter how it closed.
+  const restoreScroll = () => {
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+  };
 
   if (bellBtn) {
     bellBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      styleBellFullscreen();
       bellPanel.classList.remove('hidden');
       document.body.style.overflow = 'hidden';
       // NOTE: badge count is NOT cleared on open. It only clears when the
       // creator clicks Save or Undo (see clearAllAdminActivity()).
       loadNotifications();
     });
-    const closeBell = () => { bellPanel.classList.add('hidden'); document.body.style.overflow = ''; };
+    const closeBell = () => { bellPanel.classList.add('hidden'); restoreScroll(); };
     document.getElementById('notif-bell-close')?.addEventListener('click', closeBell);
-    bellPanel.addEventListener('click', (e) => { if (e.target === bellPanel) closeBell(); });
+    bellPanel.addEventListener('click', (e) => {
+      if (e.target === bellPanel || e.target?.id === 'notif-bell-close') closeBell();
+    });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !bellPanel.classList.contains('hidden')) closeBell(); });
+    styleBellFullscreen();
     loadNotifications();
     setInterval(loadNotifications, 30000);
+  }
+  // Safety net: if anything else hides the panel, make sure the page can scroll again.
+  if (bellPanel) {
+    new MutationObserver(() => {
+      if (bellPanel.classList.contains('hidden')) restoreScroll();
+    }).observe(bellPanel, { attributes: true, attributeFilter: ['class'] });
   }
 
   // --- "See More" + Multi-Link enhancement on projects -----------
@@ -2963,12 +3093,12 @@ window.saveSocialEdit = async function() {
     window.deleteItem = async function(table, id) {
       let label = id, image = null;
       try {
-        const cache = ({ projects: window.allProjects, certificates: window.allCerts, hobbies: [], socials: window.socialsCache })[table] || [];
+        const cache = ({ projects: window.allProjects, certificates: window.allCerts, hobbies: window.allHobbies, socials: window.socialsCache })[table] || [];
         const it = cache.find(x => x && x.id === id);
         if (it) { label = it.title || it.platform || id; image = it.image_url || it.cover_image || null; }
       } catch{}
       const r = await _del(table, id);
-      logActivity({ action: 'delete', entity_type: table.replace(/s$/, ''), entity_label: label, image_url: image });
+      if (r !== false) logActivity({ action: 'delete', entity_type: table.replace(/s$/, ''), entity_label: label, image_url: image });
       return r;
     };
   }
@@ -2977,32 +3107,8 @@ window.saveSocialEdit = async function() {
     const _ep = window.editProject;
     window.editProject = async function(id) {
       const r = await _ep(id);
-      const p = (window.allProjects || []).find(x => x.id === id);
-      logActivity({ action: 'update', entity_type: 'project', entity_label: p?.title || id, image_url: p?.image_url || null, details: 'Edited project details' });
       return r;
     };
   }
-  // Hook the add-form submit (after it finishes successfully reload, we sniff)
-  const _adminForm = document.getElementById('admin-form');
-  if (_adminForm) {
-    _adminForm.addEventListener('submit', () => {
-      // give the existing handler a moment to insert
-      setTimeout(async () => {
-        try {
-          const type = document.getElementById('form-type')?.value;
-          const title = document.getElementById('input-title')?.value;
-          if (!type || !title) return;
-          // Find newest matching row to grab its image
-          const table = type === 'cert' ? 'certificates' : type === 'project' ? 'projects' : type === 'hobby' ? 'hobbies' : 'socials';
-          const { data } = await db.from(table).select('*').order('id', { ascending: false }).limit(1);
-          const row = (data || [])[0];
-          logActivity({
-            action: 'create', entity_type: type, entity_label: title,
-            image_url: row?.image_url || row?.cover_image || null,
-            details: `Added new ${type}`
-          });
-        } catch{}
-      }, 1200);
-    });
-  }
+  // Add-form and project-edit notifications are logged at the exact successful save point above.
 })();
